@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'constants/app_colors.dart';
-import 'pages/home_page.dart';
+import 'pages/auth/auth_gate.dart';
 
 void main() {
   runApp(const BengkelTrackApp());
@@ -21,7 +21,7 @@ class BengkelTrackApp extends StatelessWidget {
         fontFamily: 'PlusJakartaSans',
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.orange),
       ),
-      home: const HomePage(),
+      home: const AuthGate(),
     );
   }
 }

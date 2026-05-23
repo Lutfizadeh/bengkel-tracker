@@ -1,4 +1,5 @@
 class AppAssets {
+  static const logo = 'assets/icons/logo bengkel track.png';
   static const slamet = 'assets/icons/gambar bengkel slamet 1.png';
   static const karya = 'assets/icons/gambar bengkel karya2.png';
   static const aki = 'assets/icons/icon aki.png';
