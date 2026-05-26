@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../home_page.dart';
+import '../mechanic/mechanic_home_page.dart';
 import 'home_splash_page.dart';
 
 class AuthGate extends StatefulWidget {
@@ -13,6 +14,7 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   bool? _isLoggedIn;
+  String? _role;
 
   @override
   void initState() {
@@ -22,7 +24,14 @@ class _AuthGateState extends State<AuthGate> {
 
   Future<void> _checkSession() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() => _isLoggedIn = prefs.getBool('is_logged_in') ?? false);
+
+    final bool isLoggedIn = prefs.getBool('is_logged_in') ?? false;
+    final String role = prefs.getString('role') ?? 'customer';
+
+    setState(() {
+      _isLoggedIn = isLoggedIn;
+      _role = role;
+    });
   }
 
   @override
@@ -30,6 +39,15 @@ class _AuthGateState extends State<AuthGate> {
     if (_isLoggedIn == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    return _isLoggedIn! ? const HomePage() : const HomeSplashPage();
+
+    if (!_isLoggedIn!) {
+      return const HomeSplashPage();
+    }
+
+    if (_role == 'mechanic') {
+      return const MechanicHomePage();
+    }
+
+    return const HomePage();
   }
 }

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../constants/app_colors.dart';
-import '../home_page.dart';
+import 'auth_gate.dart';
 import 'auth_widgets.dart';
 import 'register_step1_page.dart';
 
@@ -17,15 +17,40 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _phoneCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
+
   bool _remember = false;
   bool _hide = true;
 
+  // customer = user biasa
+  // mechanic = mekanik
+  String _selectedRole = 'customer';
+
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
+
     final prefs = await SharedPreferences.getInstance();
+
     await prefs.setBool('is_logged_in', true);
+    await prefs.setString('role', _selectedRole);
+
     if (!mounted) return;
-    Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const HomePage()), (_) => false);
+
+    // Setelah login, arahkan ke AuthGate.
+    // AuthGate yang akan memilih:
+    // role customer -> HomePage
+    // role mechanic -> MechanicHomePage
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const AuthGate()),
+      (_) => false,
+    );
+  }
+
+  @override
+  void dispose() {
+    _phoneCtrl.dispose();
+    _passCtrl.dispose();
+    super.dispose();
   }
 
   @override
@@ -43,12 +68,12 @@ class _LoginPageState extends State<LoginPage> {
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  Positioned(
+                  const Positioned(
                     top: -68,
                     right: -60,
                     child: _HeaderCircle(size: 192, color: Color(0x800F3460)),
                   ),
-                  Positioned(
+                  const Positioned(
                     top: 48,
                     left: -84,
                     child: _HeaderCircle(size: 158, color: Color(0x12FF6B35)),
@@ -59,12 +84,24 @@ class _LoginPageState extends State<LoginPage> {
                       const SizedBox(height: 10),
                       const Center(
                         child: Text.rich(
-                          TextSpan(children: [
-                            TextSpan(text: 'Bengkel ', style: TextStyle(color: Colors.white)),
-                            TextSpan(text: 'Track', style: TextStyle(color: AppColors.orange)),
-                          ]),
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'Bengkel ',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                              TextSpan(
+                                text: 'Track',
+                                style: TextStyle(color: AppColors.orange),
+                              ),
+                            ],
+                          ),
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontFamily: 'Syne', fontSize: 42, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            fontFamily: 'Syne',
+                            fontSize: 42,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -72,7 +109,12 @@ class _LoginPageState extends State<LoginPage> {
                         child: Text(
                           'Masuk untuk lanjutkan',
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontFamily: 'PlusJakartaSans', fontWeight: FontWeight.w500, color: Colors.white.withOpacity(.52), fontSize: 13),
+                          style: TextStyle(
+                            fontFamily: 'PlusJakartaSans',
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withOpacity(.52),
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                     ],
@@ -80,67 +122,189 @@ class _LoginPageState extends State<LoginPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 0),
+
             Expanded(
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(16, 40, 16, 0),
                 decoration: const BoxDecoration(color: Color(0xFFF9F8F6)),
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE6E1DA))),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _label('Nomor HP / Email'),
-                        TextFormField(
-                          controller: _phoneCtrl,
-                          onChanged: (_) => setState(() {}),
-                          style: const TextStyle(color: Colors.black),
-                          decoration: authInputDecoration(
-                            hint: 'Masukkan nomor HP atau email anda',
-                            icon: Icons.person,
-                          ).copyWith(
-                            hintStyle: TextStyle(
-                              color: _phoneCtrl.text.trim().isEmpty ? AppColors.gray : Colors.black,
+                child: SingleChildScrollView(
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFE6E1DA)),
+                    ),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _label('Nomor HP / Email'),
+                          TextFormField(
+                            controller: _phoneCtrl,
+                            onChanged: (_) => setState(() {}),
+                            style: const TextStyle(color: Colors.black),
+                            decoration: authInputDecoration(
+                              hint: 'Masukkan nomor HP atau email anda',
+                              icon: Icons.person,
+                            ).copyWith(
+                              hintStyle: TextStyle(
+                                color:
+                                    _phoneCtrl.text.trim().isEmpty
+                                        ? AppColors.gray
+                                        : Colors.black,
+                              ),
+                            ),
+                            validator:
+                                (v) =>
+                                    v == null || v.isEmpty
+                                        ? 'Wajib diisi'
+                                        : null,
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          _label('Password'),
+                          TextFormField(
+                            controller: _passCtrl,
+                            obscureText: _hide,
+                            onChanged: (_) => setState(() {}),
+                            style: const TextStyle(color: Colors.black),
+                            decoration: authInputDecoration(
+                              hint: 'Masukkan password anda',
+                              icon: Icons.lock,
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _hide
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                  color: Colors.grey,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _hide = !_hide;
+                                  });
+                                },
+                              ),
+                            ).copyWith(
+                              hintStyle: TextStyle(
+                                color:
+                                    _passCtrl.text.trim().isEmpty
+                                        ? AppColors.gray
+                                        : Colors.black,
+                              ),
+                            ),
+                            validator:
+                                (v) =>
+                                    v == null || v.length < 8
+                                        ? 'Password minimal 8 karakter'
+                                        : null,
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          Row(
+                            children: [
+                              Checkbox(
+                                value: _remember,
+                                onChanged: (v) {
+                                  setState(() {
+                                    _remember = v ?? false;
+                                  });
+                                },
+                                activeColor: AppColors.orange,
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              const Text(
+                                'Ingat saya (opsional)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.gray,
+                                ),
+                              ),
+                              const Spacer(),
+                              const Text(
+                                'Lupa password?',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.orange,
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          _label('Masuk Sebagai'),
+
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _roleButton(
+                                  title: 'User',
+                                  value: 'customer',
+                                  icon: Icons.person,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: _roleButton(
+                                  title: 'Mekanik',
+                                  value: 'mechanic',
+                                  icon: Icons.engineering,
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          OrangeButton(
+                            text: 'Masuk',
+                            onTap: _login,
+                            textStyle: const TextStyle(
+                              fontFamily: 'PlusJakartaSans',
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                          validator: (v) => v == null || v.isEmpty ? 'Wajib diisi' : null,
-                        ),
-                        const SizedBox(height: 12),
-                        _label('Password'),
-                        TextFormField(
-                          controller: _passCtrl,
-                          obscureText: _hide,
-                          onChanged: (_) => setState(() {}),
-                          style: const TextStyle(color: Colors.black),
-                          decoration: authInputDecoration(
-                            hint: 'Masukkan password anda',
-                            icon: Icons.lock,
-                            suffixIcon: IconButton(
-                              icon: Icon(_hide ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
-                              onPressed: () => setState(() => _hide = !_hide),
-                            ),
-                          ).copyWith(
-                            hintStyle: TextStyle(
-                              color: _passCtrl.text.trim().isEmpty ? AppColors.gray : Colors.black,
+
+                          const SizedBox(height: 16),
+
+                          Center(
+                            child: GestureDetector(
+                              onTap: () {
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const RegisterStep1Page(),
+                                  ),
+                                );
+                              },
+                              child: const Text.rich(
+                                TextSpan(
+                                  text: 'Belum punya akun? ',
+                                  style: TextStyle(color: AppColors.gray),
+                                  children: [
+                                    TextSpan(
+                                      text: 'Daftar Sekarang',
+                                      style: TextStyle(
+                                        color: AppColors.orange,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                style: TextStyle(fontSize: 13),
+                              ),
                             ),
                           ),
-                          validator: (v) => v == null || v.length < 8 ? 'Password minimal 8 karakter' : null,
-                        ),
-                        const SizedBox(height: 16),
-                        Row(children: [Checkbox(value: _remember, onChanged: (v) => setState(() => _remember = v ?? false), activeColor: AppColors.orange, materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, visualDensity: VisualDensity.compact), const Text('Ingat saya (opsional)', style: TextStyle(fontSize: 12, color: AppColors.gray)), const Spacer(), const Text('Lupa password?', style: TextStyle(fontSize: 11, color: AppColors.orange))]),
-                        const SizedBox(height: 20),
-                        OrangeButton(
-                          text: 'Masuk',
-                          onTap: _login,
-                          textStyle: const TextStyle(fontFamily: 'PlusJakartaSans', fontSize: 15, fontWeight: FontWeight.w500),
-                        ),
-                        const SizedBox(height: 16),
-                        Center(child: GestureDetector(onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const RegisterStep1Page())), child: const Text.rich(TextSpan(text: 'Belum punya akun? ', style: TextStyle(color: AppColors.gray), children: [TextSpan(text: 'Daftar Sekarang', style: TextStyle(color: AppColors.orange, fontWeight: FontWeight.w800))]), style: TextStyle(fontSize: 13)))),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -152,7 +316,64 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _label(String s) => Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(s, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.darkGray)));
+  Widget _roleButton({
+    required String title,
+    required String value,
+    required IconData icon,
+  }) {
+    final bool active = _selectedRole == value;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedRole = value;
+        });
+      },
+      child: Container(
+        height: 46,
+        decoration: BoxDecoration(
+          color: active ? AppColors.orange : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: active ? AppColors.orange : const Color(0xFFE6E1DA),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: active ? Colors.white : AppColors.darkGray,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              title,
+              style: TextStyle(
+                color: active ? Colors.white : AppColors.darkGray,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _label(String s) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        s,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: AppColors.darkGray,
+        ),
+      ),
+    );
+  }
 }
 
 class _HeaderCircle extends StatelessWidget {
