@@ -9,8 +9,11 @@ class AppAssets {
   static const history = 'assets/icons/icon history.png';
   static const lainnya = 'assets/icons/icon lainnya.png';
   static const mogok = 'assets/icons/icon mogok.png';
+  static const mobil = 'assets/icons/icon mobil.png';
+  static const motor = 'assets/icons/icon motor.png';
   static const oli = 'assets/icons/icon oli.png';
   static const profil = 'assets/icons/icon profil.png';
+  static const truk = 'assets/icons/icon truk.png';
   static const bell = 'assets/icons/logo notifikasi.png';
   static const vector = 'assets/icons/Vector.png';
 }

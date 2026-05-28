@@ -4,7 +4,16 @@ import '../constants/app_assets.dart';
 import '../constants/app_colors.dart';
 
 class ChatDetailPage extends StatelessWidget {
-  const ChatDetailPage({super.key});
+  const ChatDetailPage({
+    super.key,
+    this.title = 'Pak Slamet Riyadi',
+    this.subtitle = 'Online · Mekanik Senior',
+    this.asset = AppAssets.slamet,
+  });
+
+  final String title;
+  final String subtitle;
+  final String asset;
 
   @override
   Widget build(BuildContext context) {
@@ -15,34 +24,39 @@ class ChatDetailPage extends StatelessWidget {
         child: Column(
           children: [
             Container(
-              height: 124,
+              width: double.infinity,
+              height: 92,
               color: AppColors.navy,
-              padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
               child: Stack(
                 children: [
-                  const Positioned(top: 0, left: 0, child: Text('19:22', style: TextStyle(fontSize: 12, color: AppColors.gray))),
                   Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 16,
+                    left: 18,
+                    top: 51,
+                    child: GestureDetector(
+                      onTap: () => Navigator.of(context).maybePop(),
+                      child: Container(width: 30, height: 30, decoration: BoxDecoration(color: AppColors.white15, borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.chevron_left, color: AppColors.white, size: 23)),
+                    ),
+                  ),
+                  Positioned(
+                    left: 60,
+                    top: 49,
                     child: Row(
                       children: [
-                        GestureDetector(
-                          onTap: () => Navigator.of(context).maybePop(),
-                          child: Container(width: 30, height: 30, decoration: BoxDecoration(color: AppColors.white15, borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.chevron_left, color: AppColors.white, size: 24)),
+                        Container(width: 42, height: 42, decoration: BoxDecoration(color: AppColors.black, borderRadius: BorderRadius.circular(12)), child: Center(child: Image.asset(asset, width: 38))),
+                        const SizedBox(width: 9),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(title, style: const TextStyle(fontSize: 15.5, color: AppColors.white, fontWeight: FontWeight.w700, height: 1)),
+                            const SizedBox(height: 3),
+                            Row(children: [const CircleAvatar(radius: 4, backgroundColor: AppColors.brightGreen), const SizedBox(width: 4), Text(subtitle, style: const TextStyle(fontSize: 11, color: AppColors.gray))]),
+                          ],
                         ),
-                        const SizedBox(width: 11),
-                        Container(width: 42, height: 42, decoration: BoxDecoration(color: AppColors.black, borderRadius: BorderRadius.circular(12)), child: Center(child: Image.asset(AppAssets.slamet, width: 38))),
-                        const SizedBox(width: 11),
-                        const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('Pak Slamet Riyadi', style: TextStyle(fontSize: 15.5, color: AppColors.white, fontWeight: FontWeight.w700)),
-                          SizedBox(height: 3),
-                          Row(children: [CircleAvatar(radius: 4, backgroundColor: AppColors.brightGreen), SizedBox(width: 4), Text('Online · Mekanik Senior', style: TextStyle(fontSize: 11, color: AppColors.gray))]),
-                        ])),
-                        Container(width: 30, height: 30, decoration: BoxDecoration(color: AppColors.white15, borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.more_horiz, color: AppColors.white, size: 22)),
                       ],
                     ),
                   ),
+                  Positioned(right: 17, top: 51, child: Container(width: 30, height: 30, decoration: BoxDecoration(color: AppColors.white15, borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.more_horiz, color: AppColors.white))),
                 ],
               ),
             ),

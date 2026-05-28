@@ -30,15 +30,6 @@ class BengkelSearchBar extends StatelessWidget {
               ),
             ),
           ),
-          Container(
-            width: 28,
-            height: 28,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.orange,
-            ),
-            child: const Icon(Icons.menu_rounded, color: AppColors.white, size: 20),
-          ),
         ],
       ),
     );

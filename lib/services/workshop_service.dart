@@ -6,37 +6,33 @@ import '../models/workshop.dart';
 class WorkshopService {
   static const String baseUrl = 'http://127.0.0.1:8000/api';
 
+  static Future<List<Workshop>> _fetchWorkshops(Uri url) async {
+    try {
+      final response = await http.get(url).timeout(const Duration(seconds: 12));
+
+      if (response.statusCode != 200) {
+        return [];
+      }
+
+      final result = jsonDecode(response.body);
+      final List data = result['data'] ?? const [];
+      return data.map((item) => Workshop.fromJson(item)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
   static Future<List<Workshop>> getNearestWorkshops({
     required double lat,
     required double lng,
   }) async {
     final url = Uri.parse('$baseUrl/workshops/nearest?lat=$lat&lng=$lng');
-
-    final response = await http.get(url);
-
-    if (response.statusCode == 200) {
-      final result = jsonDecode(response.body);
-      final List data = result['data'];
-
-      return data.map((item) => Workshop.fromJson(item)).toList();
-    } else {
-      throw Exception('Gagal mengambil data bengkel terdekat');
-    }
+    return _fetchWorkshops(url);
   }
 
   static Future<List<Workshop>> getAllWorkshops() async {
     final url = Uri.parse('$baseUrl/workshops');
-
-    final response = await http.get(url);
-
-    if (response.statusCode == 200) {
-      final result = jsonDecode(response.body);
-      final List data = result['data'];
-
-      return data.map((item) => Workshop.fromJson(item)).toList();
-    } else {
-      throw Exception('Gagal mengambil data bengkel');
-    }
+    return _fetchWorkshops(url);
   }
 
   static Future<List<Workshop>> getTopRatedWorkshops({
@@ -44,17 +40,7 @@ class WorkshopService {
     required double lng,
   }) async {
     final url = Uri.parse('$baseUrl/workshops/top-rated?lat=$lat&lng=$lng');
-
-    final response = await http.get(url);
-
-    if (response.statusCode == 200) {
-      final result = jsonDecode(response.body);
-      final List data = result['data'];
-
-      return data.map((item) => Workshop.fromJson(item)).toList();
-    } else {
-      throw Exception('Gagal mengambil data bengkel rating tertinggi');
-    }
+    return _fetchWorkshops(url);
   }
 
   static Future<List<Workshop>> getFilteredWorkshops({
@@ -74,15 +60,6 @@ class WorkshopService {
       url += '&is_open=${isOpen ? 1 : 0}';
     }
 
-    final response = await http.get(Uri.parse(url));
-
-    if (response.statusCode == 200) {
-      final result = jsonDecode(response.body);
-      final List data = result['data'];
-
-      return data.map((item) => Workshop.fromJson(item)).toList();
-    } else {
-      throw Exception('Gagal mengambil filter bengkel');
-    }
+    return _fetchWorkshops(Uri.parse(url));
   }
 }

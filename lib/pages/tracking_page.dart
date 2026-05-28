@@ -14,6 +14,7 @@ import 'chat_detail_page.dart';
 import 'chat_list_page.dart';
 import 'history_page.dart';
 import 'home_page.dart';
+import 'profile_page.dart';
 
 class TrackingPage extends StatelessWidget {
   const TrackingPage({
@@ -154,6 +155,9 @@ class TrackingPage extends StatelessWidget {
                   ),
                   onChatTap: () => Navigator.of(context).pushReplacement(
                     MaterialPageRoute(builder: (_) => const ChatListPage()),
+                  ),
+                  onProfileTap: () => Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (_) => const ProfilePage()),
                   ),
                 ),
               ],

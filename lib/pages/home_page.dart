@@ -16,6 +16,7 @@ import 'service_page.dart';
 import 'workshop_detail_page.dart';
 import 'history_page.dart';
 import 'chat_list_page.dart';
+import 'profile_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -361,7 +362,7 @@ class _HomePageState extends State<HomePage> {
           children: [
             Positioned.fill(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: 92),
+                padding: EdgeInsets.only(bottom: 92 + MediaQuery.of(context).viewPadding.bottom),
                 physics: const BouncingScrollPhysics(),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -439,6 +440,9 @@ class _HomePageState extends State<HomePage> {
               ),
               onChatTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const ChatListPage()),
+              ),
+              onProfileTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ProfilePage()),
               ),
             ),
           ],

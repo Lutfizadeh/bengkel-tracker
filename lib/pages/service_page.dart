@@ -4,14 +4,15 @@ import 'package:geolocator/geolocator.dart';
 import '../constants/app_assets.dart';
 import '../constants/app_colors.dart';
 import '../models/mechanic.dart';
+import '../models/vehicle.dart';
 import '../services/mechanic_service.dart';
+import '../services/local_data_service.dart';
 import '../services/order_service.dart';
-import '../widgets/bottom_navbar.dart';
 import '../widgets/order_info_cards.dart';
 import '../widgets/service_card.dart';
 import 'tracking_page.dart';
-import 'history_page.dart';
-import 'chat_list_page.dart';
+import 'vehicle_select_page.dart';
+import 'vehicle_form_page.dart';
 
 class ServicePage extends StatefulWidget {
   const ServicePage({super.key});
@@ -24,6 +25,7 @@ class _ServicePageState extends State<ServicePage> {
   int selectedServiceIndex = 0;
   bool isLoading = false;
   bool isLocationLoading = true;
+  Vehicle? selectedVehicle;
 
   double userLat = -7.1187;
   double userLng = 112.4215;
@@ -40,6 +42,38 @@ class _ServicePageState extends State<ServicePage> {
   void initState() {
     super.initState();
     _loadInitialLocation();
+    _loadVehicle();
+  }
+
+
+  Future<void> _loadVehicle() async {
+    var vehicle = await LocalDataService.getMainVehicle();
+    if (vehicle == null) {
+      vehicle = const Vehicle(
+        id: 'sample-main',
+        type: 'Motor',
+        brand: 'Honda',
+        model: 'Beat Karbu',
+        year: '2011',
+        transmission: 'Matic',
+        color: 'Hitam',
+        platePrefix: 'S',
+        plateNumber: '5555 TLD',
+        isMain: true,
+      );
+    }
+    if (mounted) setState(() => selectedVehicle = vehicle);
+  }
+
+  Future<void> _openVehiclePicker() async {
+    final vehicles = await LocalDataService.getVehicles();
+    if (!mounted) return;
+    if (vehicles.isEmpty) {
+      await Navigator.push(context, MaterialPageRoute(builder: (_) => const VehicleFormPage()));
+    } else {
+      await Navigator.push(context, MaterialPageRoute(builder: (_) => const VehicleSelectPage()));
+    }
+    await _loadVehicle();
   }
 
   Future<void> _loadInitialLocation() async {
@@ -171,39 +205,56 @@ class _ServicePageState extends State<ServicePage> {
           children: [
             Positioned.fill(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: 92),
+                padding: const EdgeInsets.only(bottom: 24),
                 physics: const BouncingScrollPhysics(),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
                       width: double.infinity,
-                      height: 190,
+                      height: 203,
                       color: AppColors.navy,
                       child: Stack(
                         children: [
                           Positioned(
-                            left: 20,
+                            left: 18,
                             top: 44,
-                            child: GestureDetector(
-                              onTap: () => Navigator.of(context).maybePop(),
-                              child: const Text(
-                                '← Kembali',
-                                style: TextStyle(
-                                  color: AppColors.gray,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w400,
+                            child: Row(
+                              children: [
+                                GestureDetector(
+                                  onTap: () => Navigator.of(context).maybePop(),
+                                  child: Container(
+                                    width: 30,
+                                    height: 30,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.white15,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(
+                                      Icons.chevron_left,
+                                      color: AppColors.white,
+                                      size: 23,
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'Beranda',
+                                  style: TextStyle(
+                                    color: AppColors.gray,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const Padding(
-                            padding: EdgeInsets.only(left: 20, top: 47),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 20, top: 47, right: 20),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                SizedBox(height: 44),
-                                Text(
+                                const SizedBox(height: 44),
+                                const Text(
                                   'Pilih Layanan',
                                   style: TextStyle(
                                     color: AppColors.white,
@@ -213,8 +264,8 @@ class _ServicePageState extends State<ServicePage> {
                                     height: 1,
                                   ),
                                 ),
-                                SizedBox(height: 6),
-                                Text(
+                                const SizedBox(height: 6),
+                                const Text(
                                   'Mekanik siap datang ke lokasi kamu',
                                   style: TextStyle(
                                     color: AppColors.gray,
@@ -222,6 +273,8 @@ class _ServicePageState extends State<ServicePage> {
                                     fontWeight: FontWeight.w400,
                                   ),
                                 ),
+                                const SizedBox(height: 12),
+                                _selectedVehicleHeader(),
                               ],
                             ),
                           ),
@@ -306,21 +359,68 @@ class _ServicePageState extends State<ServicePage> {
                 ),
               ),
             ),
-            BottomNavbar(
-              activeIndex: 2,
-              onCenterTap: isLoading ? () {} : _findMechanicAndCreateOrder,
-              onHomeTap: () => Navigator.of(context).maybePop(),
-              onHistoryTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const HistoryPage()),
-              ),
-              onChatTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ChatListPage()),
-              ),
-            ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _selectedVehicleHeader() {
+    final vehicle = selectedVehicle;
+    if (vehicle == null) return const SizedBox(height: 42);
+    return GestureDetector(
+      onTap: _openVehiclePicker,
+      child: Container(
+        height: 42,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(.10),
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(color: Colors.white.withOpacity(.14)),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 15,
+              backgroundColor: AppColors.orange,
+              child: Padding(
+                padding: const EdgeInsets.all(2.5),
+                child: Image.asset(
+                  _vehicleAsset(vehicle.type),
+                  width: 16,
+                  height: 16,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(vehicle.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                  Text(vehicle.color, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.gray, fontSize: 10.5)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.white, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _vehicleIcon(String type) {
+    if (type == 'Mobil') return Icons.directions_car;
+    if (type == 'Truk/Bus') return Icons.local_shipping;
+    return Icons.two_wheeler;
+  }
+
+  String _vehicleAsset(String type) {
+    if (type == 'Mobil') return AppAssets.mobil;
+    if (type == 'Truk/Bus') return AppAssets.truk;
+    return AppAssets.motor;
   }
 }
 

@@ -7,9 +7,85 @@ import 'chat_detail_page.dart';
 import 'history_page.dart';
 import 'home_page.dart';
 import 'service_page.dart';
+import 'profile_page.dart';
 
-class ChatListPage extends StatelessWidget {
+enum _ChatCategory { bengkel, mekanik, csSupport }
+
+class _ChatItem {
+  const _ChatItem({
+    required this.asset,
+    required this.name,
+    required this.message,
+    required this.sub,
+    required this.time,
+    required this.unread,
+    required this.category,
+    this.online = false,
+    this.verified = false,
+  });
+
+  final String asset;
+  final String name;
+  final String message;
+  final String sub;
+  final String time;
+  final String unread;
+  final _ChatCategory category;
+  final bool online;
+  final bool verified;
+}
+
+const List<_ChatItem> _chatItems = [
+  _ChatItem(
+    asset: AppAssets.slamet,
+    name: 'Pak Slamet Riyadi',
+    message: 'Siap! ETA 8 menit lagi ya.',
+    sub: 'Bengkel Pak Slamet',
+    time: '19:22',
+    unread: '2',
+    category: _ChatCategory.mekanik,
+    online: true,
+  ),
+  _ChatItem(
+    asset: AppAssets.karya,
+    name: 'Auto Karya Motor',
+    message: 'Harga ban belakang Rp 95.000...',
+    sub: '',
+    time: 'Kemarin',
+    unread: '1',
+    category: _ChatCategory.bengkel,
+  ),
+  _ChatItem(
+    asset: AppAssets.lainnya,
+    name: 'Novi Garage',
+    message: 'Anda: Oke siap Pak, makasih 🙏',
+    sub: 'Order selesai',
+    time: '14 Apr',
+    unread: '0',
+    category: _ChatCategory.bengkel,
+    verified: false,
+  ),
+  _ChatItem(
+    asset: AppAssets.chat,
+    name: 'Bengkel Track Support',
+    message: 'Selamat datang di BengkelTrack!',
+    sub: 'Otomatis',
+    time: '10 Apr',
+    unread: '0',
+    category: _ChatCategory.csSupport,
+    verified: true,
+  ),
+];
+
+class ChatListPage extends StatefulWidget {
   const ChatListPage({super.key});
+
+  @override
+  State<ChatListPage> createState() => _ChatListPageState();
+}
+
+class _ChatListPageState extends State<ChatListPage> {
+  _ChatCategory? _selectedCategory;
 
   void _goHome(BuildContext context) => Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const HomePage()),
@@ -18,6 +94,8 @@ class ChatListPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visibleItems = _chatItems.where((item) => _selectedCategory == null || item.category == _selectedCategory).toList();
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -26,72 +104,81 @@ class ChatListPage extends StatelessWidget {
           children: [
             Positioned.fill(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: 104),
+                padding: EdgeInsets.only(bottom: 104 + MediaQuery.of(context).viewPadding.bottom),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(
-                      height: 110,
+                    Container(
+                      width: double.infinity,
+                      height: 190,
+                      color: AppColors.navy,
                       child: Stack(
                         children: [
-                          Container(color: AppColors.navy),
-                          const Positioned(
-                            right: -12,
-                            top: -20,
-                            child: CircleAvatar(radius: 60, backgroundColor: AppColors.blueNavy),
-                          ),
-                          const Positioned(
-                            left: 19,
-                            top: 15,
-                            child: Text('19:22', style: TextStyle(color: AppColors.gray, fontSize: 12)),
-                          ),
+                          const Positioned(right: -12, top: -20, child: CircleAvatar(radius: 60, backgroundColor: AppColors.blueNavy)),
                           Positioned(
-                            left: 19,
-                            top: 50,
+                            left: 18,
+                            top: 44,
                             child: Row(
                               children: [
-                                const Text('Pesan', style: TextStyle(color: AppColors.white, fontSize: 22, fontWeight: FontWeight.w700, fontFamily: 'Syne')),
+                                GestureDetector(
+                                  onTap: () => _goHome(context),
+                                  child: Container(
+                                    width: 30,
+                                    height: 30,
+                                    decoration: BoxDecoration(color: AppColors.white15, borderRadius: BorderRadius.circular(8)),
+                                    child: const Icon(Icons.chevron_left, color: AppColors.white, size: 23),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text('Beranda', style: TextStyle(color: AppColors.gray, fontSize: 13)),
+                              ],
+                            ),
+                          ),
+                          Positioned(
+                            left: 20,
+                            top: 104,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text('Pesan', style: const TextStyle(color: AppColors.white, fontSize: 23, fontWeight: FontWeight.w700, fontFamily: 'Syne', height: 1)),
                                 const SizedBox(width: 9),
                                 Container(
                                   width: 22,
                                   height: 22,
+                                  margin: const EdgeInsets.only(bottom: 2),
                                   decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.orange),
                                   child: const Center(child: Text('3', style: TextStyle(color: AppColors.white, fontSize: 11, fontWeight: FontWeight.w700))),
                                 ),
                               ],
                             ),
                           ),
-                          const Positioned(right: 51, top: 47, child: _HeaderIcon(icon: Icons.edit_outlined)),
-                          const Positioned(right: 18, top: 47, child: _HeaderIcon(icon: Icons.search)),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    const _SearchBox(),
                     const SizedBox(height: 14),
-                    const _FilterTabs(),
+                    _FilterTabs(
+                      selectedCategory: _selectedCategory,
+                      onSelected: (category) => setState(() => _selectedCategory = category),
+                    ),
                     const SizedBox(height: 13),
-                    _ChatTile(
-                      asset: AppAssets.slamet,
-                      name: 'Pak Slamet Riyadi',
-                      message: 'Siap! ETA 8 menit lagi ya.',
-                      sub: 'Bengkel Pak Slamet',
-                      time: '19:22',
-                      unread: '2',
-                      online: true,
-                      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ChatDetailPage())),
-                    ),
-                    _ChatTile(
-                      asset: AppAssets.karya,
-                      name: 'Auto Karya Motor',
-                      message: 'Harga ban belakang Rp 95.000...',
-                      sub: '',
-                      time: 'Kemarin',
-                      unread: '1',
-                      onTap: () {},
-                    ),
-                    const _InitialTile(initial: 'GARAGE', name: 'Novi Garage', message: 'Anda: Oke siap Pak, makasih 🙏', sub: 'Order selesai', time: '14 Apr'),
-                    const _InitialTile(initial: 'BT', name: 'Bengkel Track Support', message: 'Selamat datang di BengkelTrack!', sub: 'Otomatis', time: '10 Apr', verified: true),
+                    ...visibleItems.map((item) => _ChatTile(
+                          asset: item.asset,
+                          name: item.name,
+                          message: item.message,
+                          sub: item.sub,
+                          unread: item.unread,
+                          online: item.online,
+                          verified: item.verified,
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ChatDetailPage(
+                                title: item.name,
+                                subtitle: item.sub.isEmpty ? 'Percakapan aktif' : item.sub,
+                                asset: item.asset,
+                              ),
+                            ),
+                          ),
+                        )),
                     const SizedBox(height: 20),
                     const Center(child: Text('Tidak ada pesan lagi', style: TextStyle(fontSize: 12, color: Color(0xFFC6C1BB)))),
                     const SizedBox(height: 40),
@@ -106,6 +193,7 @@ class ChatListPage extends StatelessWidget {
               onHomeTap: () => _goHome(context),
               onHistoryTap: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HistoryPage())),
               onChatTap: () {},
+              onProfileTap: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const ProfilePage())),
             ),
           ],
         ),
@@ -114,58 +202,39 @@ class ChatListPage extends StatelessWidget {
   }
 }
 
-class _HeaderIcon extends StatelessWidget {
-  const _HeaderIcon({required this.icon});
-  final IconData icon;
-  @override
-  Widget build(BuildContext context) => Container(
-        width: 34,
-        height: 34,
-        decoration: BoxDecoration(color: AppColors.white15, borderRadius: BorderRadius.circular(9)),
-        child: Icon(icon, color: AppColors.white80, size: 21),
-      );
-}
-
-class _SearchBox extends StatelessWidget {
-  const _SearchBox();
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Container(
-          height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(color: AppColors.white, border: Border.all(color: AppColors.warmBorder), borderRadius: BorderRadius.circular(14)),
-          child: const Row(children: [
-            Icon(Icons.search, color: AppColors.gray, size: 24),
-            SizedBox(width: 8),
-            Text('Cari percakapan...', style: TextStyle(color: AppColors.gray, fontSize: 13)),
-          ]),
-        ),
-      );
-}
-
 class _FilterTabs extends StatelessWidget {
-  const _FilterTabs();
+  const _FilterTabs({required this.selectedCategory, required this.onSelected});
+
+  final _ChatCategory? selectedCategory;
+  final ValueChanged<_ChatCategory?> onSelected;
+
   @override
   Widget build(BuildContext context) {
-    final tabs = ['Semua', 'Bengkel', 'Mekanik', 'CS Support'];
+    final tabs = <MapEntry<_ChatCategory?, String>>[
+      const MapEntry(null, 'Semua'),
+      const MapEntry(_ChatCategory.bengkel, 'Bengkel'),
+      const MapEntry(_ChatCategory.mekanik, 'Mekanik'),
+      const MapEntry(_ChatCategory.csSupport, 'CS Support'),
+    ];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
-        children: tabs.map((t) {
-          final active = t == 'Semua';
+        children: tabs.map((entry) {
+          final active = entry.key == selectedCategory;
           return Expanded(
-            flex: t == 'CS Support' ? 14 : 11,
-            child: Container(
-              height: 31,
-              margin: const EdgeInsets.only(right: 7),
-              decoration: BoxDecoration(
-                color: active ? AppColors.navy : AppColors.white,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: active ? AppColors.navy : AppColors.warmBorder),
-              ),
-              child: Center(
-                child: Text(t, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: active ? AppColors.white : AppColors.darkGray)),
+            child: GestureDetector(
+              onTap: () => onSelected(entry.key),
+              child: Container(
+                height: 31,
+                margin: const EdgeInsets.only(right: 7),
+                decoration: BoxDecoration(
+                  color: active ? AppColors.navy : AppColors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: active ? AppColors.navy : AppColors.warmBorder),
+                ),
+                child: Center(
+                  child: Text(entry.value, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: active ? AppColors.white : AppColors.darkGray)),
+                ),
               ),
             ),
           );
@@ -176,9 +245,10 @@ class _FilterTabs extends StatelessWidget {
 }
 
 class _ChatTile extends StatelessWidget {
-  const _ChatTile({required this.asset, required this.name, required this.message, required this.sub, required this.time, required this.unread, this.online = false, required this.onTap});
-  final String asset, name, message, sub, time, unread;
+  const _ChatTile({required this.asset, required this.name, required this.message, required this.sub, required this.unread, this.online = false, this.verified = false, required this.onTap});
+  final String asset, name, message, sub, unread;
   final bool online;
+  final bool verified;
   final VoidCallback onTap;
 
   @override
@@ -191,8 +261,9 @@ class _ChatTile extends StatelessWidget {
           child: Row(
             children: [
               Stack(children: [
-                Container(width: 48, height: 48, decoration: const BoxDecoration(color: AppColors.black, shape: BoxShape.circle), child: Center(child: Image.asset(asset, width: 42))),
+                Container(width: 48, height: 48, decoration: BoxDecoration(color: verified ? AppColors.navy : AppColors.black, shape: BoxShape.circle), child: Center(child: Image.asset(asset, width: 42))),
                 if (online) const Positioned(right: 1, bottom: 2, child: CircleAvatar(radius: 6, backgroundColor: AppColors.brightGreen)),
+                if (verified) const Positioned(right: 0, top: 0, child: CircleAvatar(radius: 8, backgroundColor: AppColors.blue, child: Icon(Icons.check, color: AppColors.white, size: 10))),
               ]),
               const SizedBox(width: 12),
               Expanded(child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -202,9 +273,7 @@ class _ChatTile extends StatelessWidget {
                 if (sub.isNotEmpty) Text(sub, style: const TextStyle(fontSize: 11, color: AppColors.gray)),
               ])),
               Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Text(time, style: const TextStyle(fontSize: 11, color: AppColors.orange)),
-                const SizedBox(height: 9),
-                Container(width: 21, height: 21, decoration: const BoxDecoration(color: AppColors.orange, shape: BoxShape.circle), child: Center(child: Text(unread, style: const TextStyle(fontSize: 10, color: AppColors.white, fontWeight: FontWeight.w700)))),
+                if (unread != '0') Container(width: 21, height: 21, decoration: const BoxDecoration(color: AppColors.orange, shape: BoxShape.circle), child: Center(child: Text(unread, style: const TextStyle(fontSize: 10, color: AppColors.white, fontWeight: FontWeight.w700)))),
               ]),
             ],
           ),

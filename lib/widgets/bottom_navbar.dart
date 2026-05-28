@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:iconify_flutter/iconify_flutter.dart';
+import 'package:iconify_flutter/icons/ic.dart';
+import 'package:iconify_flutter/icons/material_symbols.dart';
 
-import '../constants/app_assets.dart';
 import '../constants/app_colors.dart';
+
+const String _iconamoonProfileFill =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="M8 7a4 4 0 1 1 8 0a4 4 0 0 1-8 0m0 6a5 5 0 0 0-5 5a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3a5 5 0 0 0-5-5z" clip-rule="evenodd"/></svg>';
 
 class BottomNavbar extends StatelessWidget {
   const BottomNavbar({
@@ -42,26 +47,26 @@ class BottomNavbar extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   NavItem(
-                    asset: AppAssets.beranda,
+                    icon: Ic.round_home,
                     label: 'Beranda',
                     active: activeIndex == 0,
                     onTap: onHomeTap,
                   ),
                   NavItem(
-                    asset: AppAssets.history,
+                    icon: Ic.baseline_history,
                     label: 'History',
                     active: activeIndex == 1,
                     onTap: onHistoryTap,
                   ),
                   const SizedBox(width: 62),
                   NavItem(
-                    asset: AppAssets.chat,
+                    icon: MaterialSymbols.chat_rounded,
                     label: 'Chat',
                     active: activeIndex == 3,
                     onTap: onChatTap,
                   ),
                   NavItem(
-                    asset: AppAssets.profil,
+                    icon: _iconamoonProfileFill,
                     label: 'Profil',
                     active: activeIndex == 4,
                     onTap: onProfileTap,
@@ -98,13 +103,13 @@ class BottomNavbar extends StatelessWidget {
 class NavItem extends StatelessWidget {
   const NavItem({
     super.key,
-    required this.asset,
+    required this.icon,
     required this.label,
     required this.active,
     this.onTap,
   });
 
-  final String asset;
+  final String icon;
   final String label;
   final bool active;
   final VoidCallback? onTap;
@@ -121,11 +126,10 @@ class NavItem extends StatelessWidget {
           children: [
             Opacity(
               opacity: active ? 1 : 0.7,
-              child: Image.asset(
-                asset,
-                width: 25,
-                height: 25,
-                fit: BoxFit.contain,
+              child: Iconify(
+                icon,
+                size: 25,
+                color: active ? AppColors.orange : AppColors.gray,
               ),
             ),
             const SizedBox(height: 2),

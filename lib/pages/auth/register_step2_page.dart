@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../constants/app_colors.dart';
+import '../../services/local_data_service.dart';
 import 'auth_widgets.dart';
 import 'verification_success_page.dart';
 
@@ -40,8 +41,10 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    await LocalDataService.saveProfile(name: widget.name, phone: widget.phone, email: widget.email);
+    if (!mounted) return;
     Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => VerificationSuccessPage(name: widget.name, phone: widget.phone, email: widget.email)), (_) => false);
   }
 
