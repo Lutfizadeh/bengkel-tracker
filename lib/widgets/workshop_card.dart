@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../constants/app_assets.dart';
 import '../constants/app_colors.dart';
 
 class WorkshopCard extends StatelessWidget {
@@ -26,6 +27,8 @@ class WorkshopCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool useLightLogoBg =
+      asset == AppAssets.bengkelMusiman || asset == AppAssets.gopalGarage;
     final String statusText = isOpen ? 'Buka' : 'Tutup';
     final Color statusBg = isOpen ? AppColors.lightGreen : const Color(0xFFFFE5E5);
     final Color statusColor = isOpen ? AppColors.green : AppColors.red;
@@ -45,9 +48,9 @@ class WorkshopCard extends StatelessWidget {
             Container(
               height: 88,
               width: 154,
-              decoration: const BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.only(
+              decoration: BoxDecoration(
+                color: useLightLogoBg ? AppColors.white : Colors.black,
+                borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(14),
                   topRight: Radius.circular(14),
                   bottomLeft: Radius.circular(10),
@@ -57,11 +60,14 @@ class WorkshopCard extends StatelessWidget {
               child: Stack(
                 children: [
                   Center(
-                    child: Image.asset(
-                      asset,
-                      width: logoWidth,
-                      height: logoHeight,
-                      fit: BoxFit.contain,
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Image.asset(
+                        asset,
+                        width: logoWidth,
+                        height: logoHeight,
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                   Positioned(

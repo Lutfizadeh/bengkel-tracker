@@ -8,7 +8,6 @@ import '../services/workshop_service.dart';
 import '../widgets/bottom_navbar.dart';
 import '../widgets/home_hero.dart';
 import '../widgets/nearby_workshop.dart';
-import '../widgets/search_bar.dart';
 import '../widgets/section_header.dart';
 import '../widgets/service_card.dart';
 import '../widgets/workshop_card.dart';
@@ -16,6 +15,7 @@ import 'service_page.dart';
 import 'workshop_detail_page.dart';
 import 'history_page.dart';
 import 'chat_list_page.dart';
+import 'profil_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -30,25 +30,34 @@ class _HomePageState extends State<HomePage> {
 
   String selectedFilter = 'semua';
 
+  final TextEditingController searchController = TextEditingController();
+  String searchQuery = '';
+
   double userLat = -7.1187;
   double userLng = 112.4215;
 
   @override
-  void initState() {
-    super.initState();
+    void initState() {
+      super.initState();
 
-    futureNearestWorkshops = WorkshopService.getNearestWorkshops(
-      lat: userLat,
-      lng: userLng,
-    );
+      futureNearestWorkshops = WorkshopService.getNearestWorkshops(
+        lat: userLat,
+        lng: userLng,
+      );
 
-    futureTopRatedWorkshops = WorkshopService.getTopRatedWorkshops(
-      lat: userLat,
-      lng: userLng,
-    );
+      futureTopRatedWorkshops = WorkshopService.getTopRatedWorkshops(
+        lat: userLat,
+        lng: userLng,
+      );
 
-    _loadUserLocation();
-  }
+      _loadUserLocation();
+    }
+
+    @override
+    void dispose() {
+      searchController.dispose();
+      super.dispose();
+    }
 
   Future<void> _loadUserLocation() async {
     try {
@@ -90,9 +99,11 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _openOrder(BuildContext context) {
+  void _openOrder(BuildContext context, int serviceIndex) {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ServicePage()),
+      MaterialPageRoute(
+        builder: (_) => ServicePage(initialServiceIndex: serviceIndex),
+      ),
     );
   }
 
@@ -142,7 +153,25 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  String _getWorkshopAsset(int index) {
+  String _getWorkshopAsset(Workshop workshop, int index) {
+    final title = workshop.title.toLowerCase();
+
+    if (title.contains('m gank') || title.contains('musiman')) {
+      return AppAssets.bengkelMusiman;
+    }
+
+    if (title.contains('sumber rejeki') || title.contains('gopal')) {
+      return AppAssets.gopalGarage;
+    }
+
+    if (title.contains('auto part')) {
+      return AppAssets.karya;
+    }
+
+    if (title.contains('pak slamet') || title.contains('slamet')) {
+      return AppAssets.slamet;
+    }
+
     if (index % 2 == 0) {
       return AppAssets.slamet;
     }
@@ -150,7 +179,17 @@ class _HomePageState extends State<HomePage> {
     return AppAssets.karya;
   }
 
-  double _getLogoWidth(int index) {
+  double _getLogoWidth(Workshop workshop, int index) {
+    final title = workshop.title.toLowerCase();
+
+    if (title.contains('m gank') || title.contains('musiman')) {
+      return 120;
+    }
+
+    if (title.contains('sumber rejeki') || title.contains('gopal')) {
+      return 120;
+    }
+
     if (index % 2 == 0) {
       return 106;
     }
@@ -158,7 +197,17 @@ class _HomePageState extends State<HomePage> {
     return 92;
   }
 
-  double _getLogoHeight(int index) {
+  double _getLogoHeight(Workshop workshop, int index) {
+    final title = workshop.title.toLowerCase();
+
+    if (title.contains('m gank') || title.contains('musiman')) {
+      return 70;
+    }
+
+    if (title.contains('sumber rejeki') || title.contains('gopal')) {
+      return 70;
+    }
+
     if (index % 2 == 0) {
       return 66;
     }
@@ -216,6 +265,24 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  List<Workshop> _filterWorkshopsBySearch(List<Workshop> workshops) {
+    final query = searchQuery.trim().toLowerCase();
+
+    if (query.isEmpty) {
+      return workshops;
+    }
+
+    return workshops.where((workshop) {
+      final title = workshop.title.toLowerCase();
+      final address = workshop.address.toLowerCase();
+      final tags = workshop.tags.join(' ').toLowerCase();
+
+      return title.contains(query) ||
+          address.contains(query) ||
+          tags.contains(query);
+    }).toList();
+  }
+
   Widget _buildTopRatedSection() {
     return SizedBox(
       height: 149,
@@ -241,13 +308,14 @@ class _HomePageState extends State<HomePage> {
             );
           }
 
-          final workshops = snapshot.data ?? [];
+          final allWorkshops = snapshot.data ?? [];
+          final workshops = _filterWorkshopsBySearch(allWorkshops);
 
           if (workshops.isEmpty) {
             return const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
               child: Text(
-                'Belum ada rekomendasi bengkel.',
+                'Bengkel tidak ditemukan.',
                 style: TextStyle(fontSize: 12),
               ),
             );
@@ -260,15 +328,15 @@ class _HomePageState extends State<HomePage> {
             separatorBuilder: (context, index) => const SizedBox(width: 12),
             itemBuilder: (context, index) {
               final workshop = workshops[index];
-              final asset = _getWorkshopAsset(index);
+              final asset = _getWorkshopAsset(workshop, index);
 
               return WorkshopCard(
                 asset: asset,
                 title: workshop.title,
                 rating: workshop.rating,
                 distance: workshop.distance,
-                logoWidth: _getLogoWidth(index),
-                logoHeight: _getLogoHeight(index),
+                logoWidth: _getLogoWidth(workshop, index),
+                logoHeight: _getLogoHeight(workshop, index),
                 isOpen: workshop.isOpen,
                 onTap: () => _openDetail(
                   context,
@@ -303,21 +371,19 @@ class _HomePageState extends State<HomePage> {
               padding: const EdgeInsets.all(16),
               child: Text(
                 'Gagal mengambil data bengkel: ${snapshot.error}',
-                style: const TextStyle(
-                  color: Colors.red,
-                  fontSize: 12,
-                ),
+                style: const TextStyle(color: Colors.red, fontSize: 12),
               ),
             );
           }
 
-          final workshops = snapshot.data ?? [];
+          final allWorkshops = snapshot.data ?? [];
+          final workshops = _filterWorkshopsBySearch(allWorkshops);
 
           if (workshops.isEmpty) {
             return const Padding(
               padding: EdgeInsets.all(16),
               child: Text(
-                'Tidak ada bengkel sesuai filter.',
+                'Tidak ada bengkel sesuai pencarian.',
                 style: TextStyle(fontSize: 12),
               ),
             );
@@ -326,7 +392,7 @@ class _HomePageState extends State<HomePage> {
           return Column(
             children: List.generate(workshops.length, (index) {
               final workshop = workshops[index];
-              final asset = _getWorkshopAsset(index);
+              final asset = _getWorkshopAsset(workshop, index);
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
@@ -337,11 +403,7 @@ class _HomePageState extends State<HomePage> {
                   distance: workshop.distance,
                   rating: workshop.rating,
                   tags: workshop.tags,
-                  onTap: () => _openDetail(
-                    context,
-                    asset,
-                    workshop,
-                  ),
+                  onTap: () => _openDetail(context, asset, workshop),
                 ),
               );
             }),
@@ -371,8 +433,62 @@ class _HomePageState extends State<HomePage> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const BengkelSearchBar(),
-                        const SizedBox(height: 12),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Container(
+                          height: 46,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(
+                            color: AppColors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.search,
+                                color: AppColors.gray,
+                                size: 22,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: TextField(
+                                  controller: searchController,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      searchQuery = value;
+                                    });
+                                  },
+                                  decoration: const InputDecoration(
+                                    hintText: 'Cari bengkel, layanan...',
+                                    hintStyle: TextStyle(
+                                      color: AppColors.gray,
+                                      fontSize: 13,
+                                    ),
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                  ),
+                                ),
+                              ),
+                              if (searchQuery.isNotEmpty)
+                                GestureDetector(
+                                  onTap: () {
+                                    searchController.clear();
+                                    setState(() {
+                                      searchQuery = '';
+                                    });
+                                  },
+                                  child: const Icon(
+                                    Icons.close,
+                                    color: AppColors.gray,
+                                    size: 20,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                         const SectionHeader(
                           title: 'Layanan Darurat',
                           left: 20,
@@ -386,22 +502,22 @@ class _HomePageState extends State<HomePage> {
                               EmergencyCard(
                                 asset: AppAssets.mogok,
                                 label: 'Mogok',
-                                onTap: () => _openOrder(context),
+                                onTap: () => _openOrder(context, 0),
                               ),
                               EmergencyCard(
                                 asset: AppAssets.ban,
                                 label: 'Ban Bocor',
-                                onTap: () => _openOrder(context),
+                                onTap: () => _openOrder(context, 1),
                               ),
                               EmergencyCard(
                                 asset: AppAssets.aki,
                                 label: 'Aki',
-                                onTap: () => _openOrder(context),
+                                onTap: () => _openOrder(context, 2),
                               ),
                               EmergencyCard(
                                 asset: AppAssets.oli,
                                 label: 'Ganti Oli',
-                                onTap: () => _openOrder(context),
+                                onTap: () => _openOrder(context, 3),
                               ),
                             ],
                           ),
@@ -432,13 +548,16 @@ class _HomePageState extends State<HomePage> {
             ),
             BottomNavbar(
               activeIndex: 0,
-              onCenterTap: () => _openOrder(context),
+              onCenterTap: () => _openOrder(context, 0),
               onHomeTap: () {},
               onHistoryTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const HistoryPage()),
               ),
               onChatTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const ChatListPage()),
+              ),
+              onProfileTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ProfilePage()),
               ),
             ),
           ],

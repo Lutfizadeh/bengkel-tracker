@@ -4,26 +4,34 @@ import 'package:geolocator/geolocator.dart';
 import '../constants/app_assets.dart';
 import '../constants/app_colors.dart';
 import '../models/mechanic.dart';
+import '../models/vehicle.dart';
 import '../services/mechanic_service.dart';
 import '../services/order_service.dart';
+import '../services/local_data_service.dart';
 import '../widgets/bottom_navbar.dart';
 import '../widgets/order_info_cards.dart';
 import '../widgets/service_card.dart';
-import 'tracking_page.dart';
+import 'vehicle_select_page.dart';
 import 'history_page.dart';
 import 'chat_list_page.dart';
+import 'payment_page.dart';
 
 class ServicePage extends StatefulWidget {
-  const ServicePage({super.key});
+  const ServicePage({super.key, this.initialServiceIndex = 0});
+
+  final int initialServiceIndex;
 
   @override
   State<ServicePage> createState() => _ServicePageState();
 }
 
 class _ServicePageState extends State<ServicePage> {
-  int selectedServiceIndex = 0;
+  late int selectedServiceIndex;
   bool isLoading = false;
   bool isLocationLoading = true;
+  Vehicle? selectedVehicle;
+
+  final TextEditingController otherProblemController = TextEditingController();
 
   double userLat = -7.1187;
   double userLng = 112.4215;
@@ -39,7 +47,32 @@ class _ServicePageState extends State<ServicePage> {
   @override
   void initState() {
     super.initState();
+    selectedServiceIndex = widget.initialServiceIndex;
+    _loadInitialVehicle();
     _loadInitialLocation();
+  }
+
+  @override
+  void dispose() {
+    otherProblemController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadInitialVehicle() async {
+    selectedVehicle = await LocalDataService.getMainVehicle();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _openVehiclePicker() async {
+    final result = await Navigator.of(context).push<Vehicle>(
+      MaterialPageRoute(builder: (_) => const VehicleSelectPage()),
+    );
+
+    if (result != null) {
+      setState(() => selectedVehicle = result);
+    } else {
+      await _loadInitialVehicle();
+    }
   }
 
   Future<void> _loadInitialLocation() async {
@@ -121,25 +154,35 @@ class _ServicePageState extends State<ServicePage> {
 
       final mechanic = mechanics.first;
       final selectedService = services[selectedServiceIndex];
-      final serviceType = _serviceTypeFromTitle(selectedService.title);
+
+      final bool isOtherService = selectedService.title == 'Lainnya';
+      final String otherProblem = otherProblemController.text.trim();
+
+      if (isOtherService && otherProblem.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Keterangan masalah wajib diisi.')),
+        );
+        return;
+      }
+
+      final String problemText =
+          isOtherService ? 'Lainnya - $otherProblem' : selectedService.title;
 
       final orderId = await OrderService.createOrder(
         userId: 1,
         workshopId: mechanic.workshopId,
         mechanicId: mechanic.id,
-        problem: selectedService.title,
+        problem: problemText,
         userLat: userLat,
         userLng: userLng,
       );
 
       if (!mounted) return;
 
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => TrackingPage(orderId: orderId),
-        ),
-      );
-    } catch (e) {
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => PaymentPage(orderId: orderId)));
+      } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -187,23 +230,33 @@ class _ServicePageState extends State<ServicePage> {
                             top: 44,
                             child: GestureDetector(
                               onTap: () => Navigator.of(context).maybePop(),
-                              child: const Text(
-                                '← Kembali',
-                                style: TextStyle(
-                                  color: AppColors.gray,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w400,
-                                ),
+                              child: const Row(
+                                children: [
+                                  Icon(
+                                    Icons.chevron_left,
+                                    color: AppColors.gray,
+                                    size: 18,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Kembali',
+                                    style: TextStyle(
+                                      color: AppColors.gray,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
-                          const Padding(
-                            padding: EdgeInsets.only(left: 20, top: 47),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 20, top: 40),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                SizedBox(height: 44),
-                                Text(
+                                const SizedBox(height: 36),
+                                const Text(
                                   'Pilih Layanan',
                                   style: TextStyle(
                                     color: AppColors.white,
@@ -213,13 +266,57 @@ class _ServicePageState extends State<ServicePage> {
                                     height: 1,
                                   ),
                                 ),
-                                SizedBox(height: 6),
-                                Text(
+                                const SizedBox(height: 6),
+                                const Text(
                                   'Mekanik siap datang ke lokasi kamu',
                                   style: TextStyle(
                                     color: AppColors.gray,
                                     fontSize: 13,
                                     fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                GestureDetector(
+                                  onTap: _openVehiclePicker,
+                                  child: Container(
+                                    height: 34,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.orange20,
+                                      borderRadius: BorderRadius.circular(18),
+                                      border: Border.all(
+                                        color: AppColors.orange,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.two_wheeler,
+                                          color: AppColors.white,
+                                          size: 16,
+                                        ),
+                                        SizedBox(width: 6),
+                                        Text(
+                                          selectedVehicle == null
+                                              ? 'Pilih kendaraan'
+                                              : selectedVehicle!.title,
+                                          style: TextStyle(
+                                            color: AppColors.orange,
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        SizedBox(width: 6),
+                                        Icon(
+                                          Icons.expand_more,
+                                          color: AppColors.white,
+                                          size: 16,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ],
@@ -263,12 +360,52 @@ class _ServicePageState extends State<ServicePage> {
                                 onTap: () {
                                   setState(() {
                                     selectedServiceIndex = index;
+
+                                    if (services[index].title != 'Lainnya') {
+                                      otherProblemController.clear();
+                                    }
                                   });
                                 },
                               );
                             }),
                           ),
                           const SizedBox(height: 17),
+
+                          if (services[selectedServiceIndex].title ==
+                              'Lainnya') ...[
+                            TextField(
+                              controller: otherProblemController,
+                              maxLines: 3,
+                              decoration: InputDecoration(
+                                hintText:
+                                    'Tulis keterangan masalah kendaraan...',
+                                hintStyle: const TextStyle(fontSize: 12),
+                                filled: true,
+                                fillColor: AppColors.white,
+                                contentPadding: const EdgeInsets.all(12),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                    color: AppColors.border,
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                    color: AppColors.border,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                    color: AppColors.orange,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+
                           LocationCard(address: locationText),
                           const SizedBox(height: 10),
                           const PriceCard(),

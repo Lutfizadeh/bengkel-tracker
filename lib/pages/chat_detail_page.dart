@@ -35,7 +35,7 @@ class ChatDetailPage extends StatelessWidget {
                         Container(width: 42, height: 42, decoration: BoxDecoration(color: AppColors.black, borderRadius: BorderRadius.circular(12)), child: Center(child: Image.asset(AppAssets.slamet, width: 38))),
                         const SizedBox(width: 11),
                         const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('Pak Slamet Riyadi', style: TextStyle(fontSize: 15.5, color: AppColors.white, fontWeight: FontWeight.w700)),
+                          Text('Bengkel Pak Slamet', style: TextStyle(fontSize: 15.5, color: AppColors.white, fontWeight: FontWeight.w700)),
                           SizedBox(height: 3),
                           Row(children: [CircleAvatar(radius: 4, backgroundColor: AppColors.brightGreen), SizedBox(width: 4), Text('Online · Mekanik Senior', style: TextStyle(fontSize: 11, color: AppColors.gray))]),
                         ])),
