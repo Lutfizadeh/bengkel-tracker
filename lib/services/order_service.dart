@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import '../models/order_tracking.dart';
 
 class OrderService {
-  static const String baseUrl = 'http://10.253.128.201:8000/api';
+  static const String baseUrl = 'https://backend-qgis.onrender.com/api';
 
   static Future<OrderTracking> getTracking(int orderId) async {
     final url = Uri.parse('$baseUrl/orders/$orderId/tracking');

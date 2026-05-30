@@ -162,4 +162,16 @@ class LocalDataService {
     );
     await prefs.setString(_vehicleKey, jsonEncode(mainVehicle.toJson()));
   }
+
+  static Future<void> logout() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // 1. Hapus data profil JSON dan role pengguna
+    await prefs.remove(_profileKey); // Menghapus key 'profile'
+    await prefs.remove('role'); // Menghapus key 'role'
+
+    // 2. Hapus data kendaraan utama yang tersimpan
+    await prefs.remove(_vehicleKey);
+    await prefs.remove(_vehiclesKey);
+  }
 }

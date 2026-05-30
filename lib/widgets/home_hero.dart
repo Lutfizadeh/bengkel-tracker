@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/local_data_service.dart';
 
 import '../constants/app_assets.dart';
 import '../constants/app_colors.dart';
@@ -26,10 +27,10 @@ class _HomeHeroState extends State<HomeHero> {
 
   // Fungsi async untuk menangkap data nama dan role hasil login tadi
   Future<void> _loadUserData() async {
-    final prefs = await SharedPreferences.getInstance();
+    final profile = await LocalDataService.getProfile();
     setState(() {
-      _name = prefs.getString('name') ?? 'Pengguna';
-      _role = prefs.getString('role') ?? 'user';
+      _name = profile['name'] ?? 'Pengguna';
+      _role = profile['role'] ?? 'user';
       _isLoading = false;
     });
   }

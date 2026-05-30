@@ -7,6 +7,7 @@ import '../constants/app_colors.dart';
 import '../models/vehicle.dart';
 import '../services/local_data_service.dart';
 import '../widgets/bottom_navbar.dart';
+import 'auth/login_page.dart';
 import 'chat_list_page.dart';
 import 'edit_profil_page.dart';
 import 'history_page.dart';
@@ -25,6 +26,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Map<String, String> profile = {};
   Vehicle? mainVehicle;
   bool notif = true;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -33,9 +35,13 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> load() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+
     profile = await LocalDataService.getProfile();
     mainVehicle = await LocalDataService.getMainVehicle();
-    if (mounted) setState(() {});
+
+    if (mounted) setState(() => _isLoading = false);
   }
 
   String initials() {
@@ -46,8 +52,64 @@ class _ProfilePageState extends State<ProfilePage> {
     return name.substring(0, 1).toUpperCase();
   }
 
+  Future<void> _actionLogout() async {
+    final konfirmasi = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text(
+              'Konfirmasi Keluar',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            content: const Text(
+              'Apakah Anda yakin ingin keluar dari akun BengkelTrack?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text(
+                  'Batal',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text(
+                  'Keluar',
+                  style: TextStyle(
+                    color: AppColors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+    );
+
+    if (konfirmasi == true) {
+      await LocalDataService.logout();
+
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginPage()),
+          (route) => false,
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.orange),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -90,8 +152,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                 Icons.directions_car,
                                 'Kendaraan Saya',
                                 mainVehicle?.title.isNotEmpty == true
-                                  ? mainVehicle!.title
-                                  : '',
+                                    ? mainVehicle!.title
+                                    : 'Tambah Kendaraan',
                                 () async {
                                   await Navigator.push(
                                     context,
@@ -104,6 +166,13 @@ class _ProfilePageState extends State<ProfilePage> {
                                   );
                                   load();
                                 },
+                              ),
+                              divider(), // Penempatan divider yang konsisten sebelum logout
+                              tile(
+                                Icons.logout,
+                                'Logout',
+                                'Keluar dari akun ini',
+                                _actionLogout,
                               ),
                             ]),
                             const SizedBox(height: 16),
@@ -167,7 +236,6 @@ class _ProfilePageState extends State<ProfilePage> {
                     context,
                     MaterialPageRoute(builder: (_) => const HistoryPage()),
                   ),
-
               onChatTap:
                   () => Navigator.pushReplacement(
                     context,
@@ -218,20 +286,15 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-GestureDetector(
+                GestureDetector(
                   onTap: () async {
-                    final result = await Navigator.push(
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => const EditProfilePage(),
                       ),
                     );
-
-                    if (result == true) {
-                      await load();
-                    } else {
-                      await load();
-                    }
+                    load();
                   },
                   child: CircleAvatar(
                     radius: 44,
@@ -256,7 +319,9 @@ GestureDetector(
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  profile['name'] ?? 'Fahmii Wulidan',
+                  profile['name']?.isNotEmpty == true
+                      ? profile['name']!
+                      : 'Pengguna',
                   style: const TextStyle(
                     fontFamily: 'Syne',
                     fontSize: 22,
@@ -265,7 +330,9 @@ GestureDetector(
                   ),
                 ),
                 Text(
-                  profile['email'] ?? 'fahmiwal3@gmail.com',
+                  profile['email']?.isNotEmpty == true
+                      ? profile['email']!
+                      : 'pengguna@gmail.com',
                   style: const TextStyle(fontSize: 12, color: AppColors.gray),
                 ),
               ],
@@ -306,8 +373,10 @@ GestureDetector(
       ),
     ),
   );
+
   Widget divider() =>
       const Divider(height: 1, indent: 52, color: AppColors.warmBorder);
+
   Widget card(List<Widget> children) => Container(
     decoration: BoxDecoration(
       color: Colors.white,
@@ -361,14 +430,9 @@ GestureDetector(
 
   ImageProvider? _avatarImage(String photoPath) {
     if (photoPath.isEmpty) return null;
-
-    if (kIsWeb) {
-      return NetworkImage(photoPath);
-    }
-
+    if (kIsWeb) return NetworkImage(photoPath);
     final file = File(photoPath);
     if (!file.existsSync()) return null;
-
     return FileImage(file);
   }
 }

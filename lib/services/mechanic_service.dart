@@ -1,42 +1,54 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-
 import '../models/mechanic.dart';
+import 'api.dart'; // Pastikan import mengarah ke file ApiService yang ada getter 'client'
 
 class MechanicService {
-  static const String baseUrl = 'http://10.253.128.201:8000/api';
+  // Alamat baseUrl tidak perlu ditulis ulang di sini karena sudah di-handle terpusat oleh ApiService.client
 
+  /// Mengambil data mekanik berdasarkan ID Bengkel
   static Future<List<Mechanic>> getMechanicsByWorkshop(int workshopId) async {
-    final url = Uri.parse('$baseUrl/mechanics');
-    // final url = Uri.parse('$baseUrl/workshops/$workshopId/mechanics');
+    try {
+      // Menggunakan ApiService.client terpusat yang otomatis membawa Token Bearer
+      final response = await ApiService.client.get(
+        '/workshops/$workshopId/mechanics',
+      );
 
-    final response = await http.get(url);
+      if (response.statusCode == 200) {
+        // PERBAIKAN: Dio otomatis mengonversi data menjadi Map/List, TIDAK PERLU jsonDecode lagi.
+        final result = response.data;
+        final List data = result['data'] ?? [];
 
-    if (response.statusCode == 200) {
-      final result = jsonDecode(response.body);
-      final List data = result['data'];
-
-      return data.map((item) => Mechanic.fromJson(item)).toList();
-    } else {
-      throw Exception('Gagal mengambil data mekanik bengkel');
+        return data.map((item) => Mechanic.fromJson(item)).toList();
+      } else {
+        throw Exception('Gagal mengambil data mekanik bengkel');
+      }
+    } catch (e) {
+      throw Exception('Terjadi kesalahan server: $e');
     }
   }
 
+  /// Mengambil data mekanik terdekat berdasarkan koordinat GPS spasial (PostGIS)
   static Future<List<Mechanic>> getNearestMechanics({
     required double lat,
     required double lng,
   }) async {
-    final url = Uri.parse('$baseUrl/mechanics/nearest?lat=$lat&lng=$lng');
+    try {
+      // PERBAIKAN: Migrasi dari package 'http' ke 'ApiService.client' (Dio) agar seragam dan aman
+      final response = await ApiService.client.get(
+        '/mechanics/nearest',
+        queryParameters: {'lat': lat, 'lng': lng},
+      );
 
-    final response = await http.get(url);
+      if (response.statusCode == 200) {
+        // Mengambil data langsung dari response body Dio
+        final result = response.data;
+        final List data = result['data'] ?? [];
 
-    if (response.statusCode == 200) {
-      final result = jsonDecode(response.body);
-      final List data = result['data'];
-
-      return data.map((item) => Mechanic.fromJson(item)).toList();
-    } else {
-      throw Exception('Gagal mengambil data mekanik terdekat');
+        return data.map((item) => Mechanic.fromJson(item)).toList();
+      } else {
+        throw Exception('Gagal mengambil data mekanik terdekat');
+      }
+    } catch (e) {
+      throw Exception('Gagal memuat maps mekanik terdekat: $e');
     }
   }
 }

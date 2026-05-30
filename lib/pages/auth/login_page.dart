@@ -1,5 +1,5 @@
 import 'package:bengkel/pages/home_page.dart';
-import 'package:bengkel/pages/mechanic/mechanic_home_page.dart'; // Pastikan impor halaman mekanik ini sudah benar
+import 'package:bengkel/pages/mechanic/mechanic_home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,6 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../constants/app_colors.dart';
 import 'auth_widgets.dart';
 import 'register_step1_page.dart';
+import '../../services/local_data_service.dart';
+import '../../services/api.dart'; // 1. PERBAIKAN: Sesuaikan dengan nama file ApiService Anda
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -26,24 +28,12 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isLoading = true);
 
     try {
-      // 1. Inisialisasi Dio
-      final dio = Dio(
-        BaseOptions(
-          baseUrl: "http://10.253.128.201:8000/api",
-          connectTimeout: const Duration(seconds: 10),
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-        ),
-      );
-
-      // 2. Eksekusi Request POST Login ke Laravel (Tanpa mengirim parameter role)
-      final response = await dio.post(
+      // 2. PERBAIKAN: Cukup panggil ApiService.client secara langsung.
+      // Url dasar (baseUrl) dan header Content-Type sudah terbungkus otomatis di dalamnya.
+      final response = await ApiService.client.post(
         '/login',
         data: {'email': _emailCtrl.text.trim(), 'password': _passCtrl.text},
       );
@@ -54,15 +44,15 @@ class _LoginPageState extends State<LoginPage> {
         final data = response.data;
         print(data);
 
-        final String token = data['access_token'];
-        final String name = data['user']['name'];
-        final String email = data['user']['email'];
+        // AMANKAN PARSING DATA DI SINI (Berikan fallback ?? '')
+        final String token = data['access_token']?.toString() ?? '';
+        final String name =
+            data['user']['name']?.toString() ?? 'Pengguna Bengkel';
+        final String email = data['user']['email']?.toString() ?? '';
         final String role =
-            data['user']['role']
-                .toString()
-                .toLowerCase(); // Ambil role dari database
+            data['user']['role']?.toString().toLowerCase() ?? 'user';
 
-        // 3. Simpan data otentikasi ke SharedPreferences
+        // 3. Simpan data otentikasi dasar ke SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('is_logged_in', true);
         await prefs.setString('access_token', token);
@@ -70,19 +60,24 @@ class _LoginPageState extends State<LoginPage> {
         await prefs.setString('email', email);
         await prefs.setString('role', role);
 
+        // Sinkronisasikan juga ke format JSON Profile milik LocalDataService
+        await LocalDataService.saveProfile(
+          name: name,
+          email: email,
+          phone: data['user']['phone']?.toString() ?? '',
+          photoPath: data['user']['photo']?.toString() ?? '',
+        );
+
         if (!mounted) return;
 
-        // 4. SISTEM OTOMATIS MENENTUKAN REDIRECT BERDASARKAN ROLE DARI BACKEND
+        // 4. SISTEM OTOMATIS MENENTUKAN REDIRECT BERDASARKAN ROLE
         if (role == 'mechanic') {
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(
-              builder: (_) => const MechanicHomePage(),
-            ), // Ganti ke nama class halaman mekanikmu
+            MaterialPageRoute(builder: (_) => const MechanicHomePage()),
             (_) => false,
           );
         } else {
-          // Jika role adalah 'user', 'customer', atau default lainnya, arahkan ke HomePage
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (_) => const HomePage()),
@@ -283,9 +278,7 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             ],
                           ),
-                          const SizedBox(
-                            height: 24,
-                          ), // Jarak disesuaikan karena tombol role dihapus
+                          const SizedBox(height: 24),
                           OrangeButton(
                             text: _isLoading ? 'Memproses...' : 'Masuk',
                             onTap: _isLoading ? () {} : _login,
