@@ -1,9 +1,10 @@
+import 'package:bengkel/pages/home_page.dart';
+import 'package:bengkel/pages/mechanic/mechanic_home_page.dart'; // Pastikan impor halaman mekanik ini sudah benar
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart'; // Tambahkan package Dio
+import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../constants/app_colors.dart';
-import '../home_page.dart';
 import 'auth_widgets.dart';
 import 'register_step1_page.dart';
 
@@ -16,11 +17,12 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+
   bool _remember = false;
   bool _hide = true;
-  bool _isLoading = false; // Status loading indikator tombol
+  bool _isLoading = false;
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
@@ -28,7 +30,7 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. Inisialisasi Dio (Sesuaikan IP Host Laravel sesuai dengan IPv4 hasil 'ipconfig')
+      // 1. Inisialisasi Dio
       final dio = Dio(
         BaseOptions(
           baseUrl: "http://10.253.128.201:8000/api",
@@ -40,15 +42,10 @@ class _LoginPageState extends State<LoginPage> {
         ),
       );
 
-      // 2. Eksekusi Request POST Login ke Laravel
+      // 2. Eksekusi Request POST Login ke Laravel (Tanpa mengirim parameter role)
       final response = await dio.post(
         '/login',
-        data: {
-          'email':
-              _emailCtrl.text
-                  .trim(), // Kolom ini bisa menerima email atau nomor HP di backend
-          'password': _passCtrl.text,
-        },
+        data: {'email': _emailCtrl.text.trim(), 'password': _passCtrl.text},
       );
 
       setState(() => _isLoading = false);
@@ -56,13 +53,16 @@ class _LoginPageState extends State<LoginPage> {
       if (response.statusCode == 200) {
         final data = response.data;
         print(data);
-        final String token = data['access_token'];
-        final String name = data['user']['name']; // Mengambil nama pengguna
-        final String email = data['user']['email']; // Mengambil email pengguna
-        final String role =
-            data['user']['role']; // Mengambil string: 'admin', 'user', atau 'mekanik'
 
-        // 3. Simpan data otentikasi menggunakan SharedPreferences bawaan
+        final String token = data['access_token'];
+        final String name = data['user']['name'];
+        final String email = data['user']['email'];
+        final String role =
+            data['user']['role']
+                .toString()
+                .toLowerCase(); // Ambil role dari database
+
+        // 3. Simpan data otentikasi ke SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('is_logged_in', true);
         await prefs.setString('access_token', token);
@@ -72,18 +72,27 @@ class _LoginPageState extends State<LoginPage> {
 
         if (!mounted) return;
 
-        // 4. Redirect ke Dashboard Utama (HomePage) secara bersih
-        // Menggunakan pushAndRemoveUntil agar tumpukan (stack) halaman login dihapus total
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const HomePage()),
-          (_) => false,
-        );
+        // 4. SISTEM OTOMATIS MENENTUKAN REDIRECT BERDASARKAN ROLE DARI BACKEND
+        if (role == 'mechanic') {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const MechanicHomePage(),
+            ), // Ganti ke nama class halaman mekanikmu
+            (_) => false,
+          );
+        } else {
+          // Jika role adalah 'user', 'customer', atau default lainnya, arahkan ke HomePage
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const HomePage()),
+            (_) => false,
+          );
+        }
       }
     } on DioException catch (e) {
       setState(() => _isLoading = false);
 
-      // Tangkap pesan kegagalan dari Laravel (misalnya password salah / akun tidak ada)
       String errorMsg = "Gagal terhubung ke server.";
       if (e.response != null && e.response?.data['message'] != null) {
         errorMsg = e.response?.data['message'];
@@ -93,6 +102,13 @@ class _LoginPageState extends State<LoginPage> {
         SnackBar(content: Text(errorMsg), backgroundColor: AppColors.red),
       );
     }
+  }
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
+    super.dispose();
   }
 
   @override
@@ -170,7 +186,6 @@ class _LoginPageState extends State<LoginPage> {
                 padding: const EdgeInsets.fromLTRB(16, 40, 16, 0),
                 decoration: const BoxDecoration(color: Color(0xFFF9F8F6)),
                 child: SingleChildScrollView(
-                  // Membungkus konten agar aman dari error overflow saat keyboard HP muncul
                   child: Container(
                     padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
                     decoration: BoxDecoration(
@@ -183,13 +198,13 @@ class _LoginPageState extends State<LoginPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _label('Email'),
+                          _label('Nomor HP / Email'),
                           TextFormField(
                             controller: _emailCtrl,
                             onChanged: (_) => setState(() {}),
                             style: const TextStyle(color: Colors.black),
                             decoration: authInputDecoration(
-                              hint: 'Masukkan email anda',
+                              hint: 'Masukkan nomor HP atau email anda',
                               icon: Icons.person,
                             ).copyWith(
                               hintStyle: TextStyle(
@@ -201,8 +216,8 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             validator:
                                 (v) =>
-                                    v == null || v.isEmpty
-                                        ? 'Wajib diisi'
+                                    v == null || v.trim().isEmpty
+                                        ? 'Nomor HP atau email wajib diisi'
                                         : null,
                           ),
                           const SizedBox(height: 12),
@@ -268,13 +283,12 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(
+                            height: 24,
+                          ), // Jarak disesuaikan karena tombol role dihapus
                           OrangeButton(
-                            text: _isLoading ? 'Memvalidasi...' : 'Masuk',
-                            onTap:
-                                _isLoading
-                                    ? () {}
-                                    : _login, // Kunci tombol saat memproses data ke server
+                            text: _isLoading ? 'Memproses...' : 'Masuk',
+                            onTap: _isLoading ? () {} : _login,
                             textStyle: const TextStyle(
                               fontFamily: 'PlusJakartaSans',
                               fontSize: 15,
@@ -284,13 +298,14 @@ class _LoginPageState extends State<LoginPage> {
                           const SizedBox(height: 16),
                           Center(
                             child: GestureDetector(
-                              onTap:
-                                  () => Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => const RegisterStep1Page(),
-                                    ),
+                              onTap: () {
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const RegisterStep1Page(),
                                   ),
+                                );
+                              },
                               child: const Text.rich(
                                 TextSpan(
                                   text: 'Belum punya akun? ',
@@ -338,15 +353,11 @@ class _LoginPageState extends State<LoginPage> {
 class _HeaderCircle extends StatelessWidget {
   final double size;
   final Color color;
-
   const _HeaderCircle({required this.size, required this.color});
-
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-    );
-  }
+  Widget build(BuildContext context) => Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+  );
 }
