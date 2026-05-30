@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../constants/app_assets.dart';
 import '../constants/app_colors.dart';
 
 class NearbyWorkshopTile extends StatelessWidget {
@@ -24,6 +25,9 @@ class NearbyWorkshopTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool useLightLogoBg =
+      asset == AppAssets.bengkelMusiman || asset == AppAssets.gopalGarage;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -39,11 +43,19 @@ class NearbyWorkshopTile extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: Colors.black,
+              color: useLightLogoBg ? AppColors.white : Colors.black,
               borderRadius: BorderRadius.circular(7),
             ),
             child: Center(
-              child: Image.asset(asset, width: 39, height: 36, fit: BoxFit.contain),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Image.asset(
+                  asset,
+                  width: 44,
+                  height: 44,
+                  fit: BoxFit.contain,
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 12),

@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../constants/app_colors.dart';
-import '../models/mechanic.dart';
 import '../models/workshop.dart';
-import '../services/mechanic_service.dart';
 import 'chat_detail_page.dart';
 import 'service_page.dart';
 
@@ -17,337 +16,331 @@ class WorkshopDetailPage extends StatelessWidget {
   final String asset;
   final Workshop workshop;
 
+  String _formatDistance(dynamic distance) {
+    final text = distance.toString();
+
+    if (text.toLowerCase().contains('km')) {
+      return text;
+    }
+
+    return '$text km';
+  }
+
+  void _shareWorkshop(BuildContext context) {
+    final text = '''
+${workshop.title}
+
+Alamat:
+${workshop.address}
+
+Rating: ${workshop.rating}
+Jarak: ${_formatDistance(workshop.distance)}
+
+Cek bengkel ini di aplikasi BengkelTrack.
+''';
+
+    Clipboard.setData(ClipboardData(text: text));
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Info bengkel berhasil disalin.'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: 18),
-                child: Column(
-                  children: [
-                    FutureBuilder<List<Mechanic>>(
-                      future: MechanicService.getMechanicsByWorkshop(
-                        workshop.id,
-                      ),
-                      builder: (context, snapshot) {
-                        final mechanics = snapshot.data ?? [];
-                        final openMechanics = mechanics
-                            .where((mechanic) => mechanic.isOpen)
-                            .length;
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final bool isWeb = constraints.maxWidth >= 900;
 
-                        String mechanicText = '-';
-
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          mechanicText = '...';
-                        } else if (snapshot.hasError) {
-                          mechanicText = '-';
-                        } else {
-                          mechanicText = openMechanics.toString();
-                        }
-
-                        return _Header(
-                          asset: asset,
-                          workshop: workshop,
-                          mechanicText: mechanicText,
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 13),
-                    const _ServiceChips(),
-                    const SizedBox(height: 14),
-                    _HoursCard(isOpen: workshop.isOpen),
-                    const SizedBox(height: 11),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 17),
-                      child: Row(
-                        children: const [
-                          Text(
-                            'Review Pelanggan',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
+            return Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: isWeb ? 900 : double.infinity,
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: double.infinity,
+                  child: Container(
+                    color: AppColors.background,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.only(bottom: 100),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildHeader(context),
+                                const SizedBox(height: 12),
+                                _buildAvailableServices(),
+                                const SizedBox(height: 12),
+                                _buildOperationalCard(),
+                                const SizedBox(height: 12),
+                                _buildReviews(),
+                                const SizedBox(height: 24),
+                              ],
                             ),
                           ),
-                          Spacer(),
-                          Text(
-                            'Semua',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.orange,
+                        ),
+                        Align(
+                          alignment: Alignment.bottomCenter,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                            child: Container(
+                              color: AppColors.background,
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: SizedBox(
+                                      height: 48,
+                                      child: OutlinedButton(
+                                        onPressed: () {
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder:
+                                                  (_) => const ChatDetailPage(),
+                                            ),
+                                          );
+                                        },
+                                        style: OutlinedButton.styleFrom(
+                                          side: const BorderSide(
+                                            color: AppColors.orange,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                          backgroundColor: AppColors.white,
+                                        ),
+                                        child: const Text(
+                                          'Chat',
+                                          style: TextStyle(
+                                            color: AppColors.orange,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: SizedBox(
+                                      height: 48,
+                                      child: ElevatedButton(
+                                        onPressed: () {
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder:
+                                                  (_) => const ServicePage(),
+                                            ),
+                                          );
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          elevation: 0,
+                                          backgroundColor: AppColors.orange,
+                                          foregroundColor: AppColors.white,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              9,
+                                            ),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'Pesan Sekarang',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 7),
-                    const _ReviewCard(
-                      initial: 'B',
-                      name: 'Budi Speed',
-                      time: '2 hr lalu',
-                      text:
-                          'Pelayanan cepat & profesional, harga wajar.\nLangsung beres dalam 30 menit. Recommended!',
-                    ),
-                    const _ReviewCard(
-                      initial: 'D',
-                      name: 'Clarisa Speed',
-                      time: '1 hari lalu',
-                      text:
-                          'Motor mogok, mekanik datang kurang dari\n10 menit. Mantap pelayanannya!',
-                      orange: true,
-                      rating: '4.8',
-                    ),
-                    const _ReviewCard(
-                      initial: 'R',
-                      name: 'Rizal Patung',
-                      time: '3 hari lalu',
-                      text: 'Harga sesuai, pengerjaan rapi. Puas!',
-                      blue: true,
-                      rating: '4.5',
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-            Container(
-              height: 86,
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
-              color: AppColors.white,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const ChatDetailPage(),
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(
-                          color: AppColors.orange,
-                          width: 1.5,
-                        ),
-                        foregroundColor: AppColors.orange,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        minimumSize: const Size.fromHeight(51),
-                      ),
-                      child: const Text(
-                        'Chat',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const ServicePage(),
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        elevation: 0,
-                        backgroundColor: AppColors.orange,
-                        foregroundColor: AppColors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        minimumSize: const Size.fromHeight(51),
-                      ),
-                      child: const Text(
-                        'Pesan Sekarang',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
   }
-}
 
-class _Header extends StatelessWidget {
-  const _Header({
-    required this.asset,
-    required this.workshop,
-    required this.mechanicText,
-  });
-
-  final String asset;
-  final Workshop workshop;
-  final String mechanicText;
-
-  @override
-  Widget build(BuildContext context) {
-    final String statusText = workshop.isOpen ? 'Buka' : 'Tutup';
-    final Color statusBg =
-        workshop.isOpen ? AppColors.lightGreen : const Color(0xFFFFE5E5);
-    final Color statusColor = workshop.isOpen ? AppColors.green : AppColors.red;
+  Widget _buildHeader(BuildContext context) {
+    final now = TimeOfDay.now();
+    final bool isOpenNow = now.hour >= 6 && now.hour < 21;
+    final String statusText = isOpenNow ? 'Buka' : 'Tutup';
+    final Color statusColor =
+        isOpenNow ? AppColors.brightGreen : AppColors.red;
+    const String timeText = '06:00 - 21:00';
 
     return Container(
-      height: 220,
+      // ✅ PERBAIKAN: Hapus height: 170 yang fixed, biarkan menyesuaikan konten
+      width: double.infinity,
       color: AppColors.navy,
-      child: Stack(
+      child: Column(
+        mainAxisSize: MainAxisSize.min, // ✅ PERBAIKAN: Tidak paksa stretch
         children: [
-          const Positioned(
-            right: -20,
-            top: -22,
-            child: CircleAvatar(
-              radius: 68,
-              backgroundColor: AppColors.blueNavy,
-            ),
-          ),
-          const Positioned(
-            left: 19,
-            top: 16,
-            child: Text(
-              '19:22',
-              style: TextStyle(color: AppColors.gray, fontSize: 12),
-            ),
-          ),
-          Positioned(
-            left: 18,
-            top: 52,
-            child: GestureDetector(
-              onTap: () => Navigator.of(context).maybePop(),
-              child: Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: AppColors.white15,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.chevron_left,
-                  color: AppColors.white,
-                  size: 25,
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            right: 18,
-            top: 52,
-            child: Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                color: AppColors.white15,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.share,
-                color: AppColors.white,
-                size: 18,
-              ),
-            ),
-          ),
-          Positioned(
-            left: 18,
-            right: 18,
-            top: 86,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 18, 0),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Stack(
-                  children: [
-                    Container(
-                      width: 62,
-                      height: 62,
-                      decoration: BoxDecoration(
-                        color: AppColors.black,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Center(
-                        child: Image.asset(asset, width: 54),
-                      ),
-                    ),
-                    const Positioned(
-                      right: -1,
-                      bottom: -1,
-                      child: CircleAvatar(
-                        radius: 9,
-                        backgroundColor: AppColors.blue,
-                        child: Icon(
-                          Icons.check,
-                          size: 12,
-                          color: AppColors.white,
-                        ),
-                      ),
-                    ),
-                  ],
+                const Text(
+                  '19:22',
+                  style: TextStyle(color: AppColors.gray, fontSize: 11),
                 ),
-                const SizedBox(width: 12),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => _shareWorkshop(context),
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: AppColors.white15,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.share,
+                      color: AppColors.white,
+                      size: 16,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
+            child: Row(
+              children: [
+                GestureDetector(
+                  onTap: () => Navigator.of(context).maybePop(),
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: AppColors.white15,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.chevron_left,
+                      color: AppColors.white,
+                      size: 22,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              18,
+              10,
+              18,
+              10,
+            ), // ✅ PERBAIKAN: Tambah bottom padding 10
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 45,
+                  height: 45,
+                  decoration: BoxDecoration(
+                    color: AppColors.black,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Center(
+                    child:
+                        asset.isEmpty
+                            ? const Icon(
+                              Icons.store,
+                              color: AppColors.white,
+                              size: 24,
+                            )
+                            : ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: Image.asset(
+                                asset,
+                                width: 40,
+                                height: 40,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                  ),
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         workshop.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: AppColors.white,
-                          fontSize: 21,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
                           fontFamily: 'Syne',
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 3),
                       Text(
                         workshop.address,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: AppColors.white70,
-                          fontSize: 11,
+                          color: AppColors.gray,
+                          fontSize: 10.5,
                         ),
                       ),
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: statusBg,
-                              borderRadius: BorderRadius.circular(9),
-                            ),
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 3,
-                                  backgroundColor: statusColor,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  statusText,
-                                  style: TextStyle(
-                                    color: statusColor,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
+                          Flexible(
+                            child: Text(
+                              timeText,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.gray,
+                                fontSize: 10.5,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Text(
-                            '06:00 – 21:00',
-                            style: TextStyle(
-                              color: AppColors.white60,
-                              fontSize: 11,
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: statusColor.withOpacity(0.18),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: statusColor),
+                            ),
+                            child: Text(
+                              statusText,
+                              style: TextStyle(
+                                color: statusColor,
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ],
@@ -358,29 +351,164 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
-          Positioned(
-            left: 18,
-            right: 18,
-            bottom: 10,
-            child: Container(
-              height: 50,
-              decoration: BoxDecoration(
-                color: AppColors.white15,
-                borderRadius: BorderRadius.circular(9),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _Stat(value: workshop.rating, label: 'Rating'),
-                  const _Divider(),
-                  const _Stat(value: '128', label: 'Review'),
-                  const _Divider(),
-                  _Stat(value: workshop.distance, label: 'Jarak'),
-                  const _Divider(),
-                  _Stat(value: mechanicText, label: 'Mekanik'),
-                ],
-              ),
+          // ✅ PERBAIKAN: Hapus Spacer(), ganti langsung ke stats bar
+          Container(
+            height: 41,
+            color: AppColors.white15,
+            child: Row(
+              children: [
+                _StatItem(
+                  value: _formatDistance(workshop.distance),
+                  label: 'Jarak',
+                ),
+                const _HeaderDivider(),
+                const _StatItem(value: '128', label: 'Review'),
+                const _HeaderDivider(),
+                _StatItem(value: workshop.rating.toString(), label: 'Rating'),
+                const _HeaderDivider(),
+                const _StatItem(value: '5+', label: 'Mekanik'),
+              ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvailableServices() {
+    final services = ['Motor', 'Mobil', 'Ganti Oli', 'Ban Bocor', 'Lainnya'];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Layanan Tersedia',
+            style: TextStyle(
+              color: AppColors.textDark,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 7),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children:
+                services.map((item) {
+                  final active = item == 'Motor' || item == 'Mobil';
+
+                  return Container(
+                    height: 22,
+                    padding: const EdgeInsets.symmetric(horizontal: 11),
+                    decoration: BoxDecoration(
+                      color: active ? AppColors.orange : AppColors.white,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: active ? AppColors.orange : AppColors.warmBorder,
+                      ),
+                    ),
+                    child: Center(
+                      widthFactor: 1,
+                      child: Text(
+                        item,
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: active ? AppColors.white : AppColors.gray,
+                          fontWeight:
+                              active ? FontWeight.w700 : FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOperationalCard() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 18),
+      padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        border: Border.all(color: AppColors.warmBorder),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Jam Operasional',
+            style: TextStyle(
+              color: AppColors.textDark,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          SizedBox(height: 5),
+          _OperationalRow(day: 'Senin - Sabtu', time: '06:00 - 21:00'),
+          SizedBox(height: 4),
+          _OperationalRow(day: 'Minggu', time: 'Tutup', closed: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviews() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      child: Column(
+        children: const [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Review Pelanggan',
+                  style: TextStyle(
+                    color: AppColors.textDark,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Text(
+                'Semua',
+                style: TextStyle(color: AppColors.orange, fontSize: 10),
+              ),
+            ],
+          ),
+          SizedBox(height: 7),
+          _ReviewCard(
+            initial: 'B',
+            name: 'Budi Speed',
+            rating: '5.0',
+            time: '2 hr lalu',
+            message:
+                'Pak Slamet cepat & profesional, harga wajar. Langsung beres dalam 30 menit. Recommended!',
+            color: AppColors.navy,
+          ),
+          SizedBox(height: 8),
+          _ReviewCard(
+            initial: 'D',
+            name: 'Clarisa Speed',
+            rating: '4.8',
+            time: '1 hari lalu',
+            message:
+                'Motor mogok, mekanik datang kurang dari 10 menit. Mantap pelayanannya!',
+            color: AppColors.orange,
+          ),
+          SizedBox(height: 8),
+          _ReviewCard(
+            initial: 'R',
+            name: 'Harry Pratama',
+            rating: '4.9',
+            time: '3 hari lalu',
+            message: 'Harga sesuai, pengerjaan rapi. Puas!',
+            color: Colors.blue,
           ),
         ],
       ),
@@ -388,149 +516,75 @@ class _Header extends StatelessWidget {
   }
 }
 
-class _Divider extends StatelessWidget {
-  const _Divider();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(width: 1, height: 29, color: AppColors.white15);
-  }
-}
-
-class _Stat extends StatelessWidget {
-  const _Stat({
-    required this.value,
-    required this.label,
-  });
+class _StatItem extends StatelessWidget {
+  const _StatItem({required this.value, required this.label});
 
   final String value;
   final String label;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 17,
-            color: AppColors.white,
-            fontWeight: FontWeight.w700,
-          ),
+    return Expanded(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              value,
+              maxLines: 1,
+              style: const TextStyle(
+                color: AppColors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            Text(
+              label,
+              maxLines: 1,
+              style: const TextStyle(color: AppColors.gray, fontSize: 9),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+class _HeaderDivider extends StatelessWidget {
+  const _HeaderDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(width: 1, height: 22, color: AppColors.white15);
+  }
+}
+
+class _OperationalRow extends StatelessWidget {
+  const _OperationalRow({
+    required this.day,
+    required this.time,
+    this.closed = false,
+  });
+
+  final String day;
+  final String time;
+  final bool closed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(day, style: const TextStyle(color: AppColors.gray, fontSize: 11)),
+        const Spacer(),
         Text(
-          label,
-          style: const TextStyle(
-            fontSize: 9.5,
-            color: AppColors.white60,
+          time,
+          style: TextStyle(
+            color: closed ? Colors.red : AppColors.textDark,
+            fontSize: 11,
           ),
         ),
       ],
-    );
-  }
-}
-
-class _ServiceChips extends StatelessWidget {
-  const _ServiceChips();
-
-  @override
-  Widget build(BuildContext context) {
-    final chips = ['Motor', 'Mobil', 'Ganti Oli', 'Ban Bocor', 'AC'];
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 18),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Wrap(
-          spacing: 7,
-          runSpacing: 7,
-          children: chips.map((c) {
-            final active = c == 'Motor' || c == 'Mobil';
-
-            return Container(
-              height: 27,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: active ? AppColors.orange : AppColors.background,
-                border: Border.all(
-                  color: active ? AppColors.orange : AppColors.warmBorder,
-                ),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Center(
-                child: Text(
-                  c,
-                  style: TextStyle(
-                    color: active ? AppColors.white : AppColors.darkGray,
-                    fontSize: 11,
-                    fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-}
-
-class _HoursCard extends StatelessWidget {
-  const _HoursCard({
-    required this.isOpen,
-  });
-
-  final bool isOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    final String statusText = isOpen ? 'Buka' : 'Tutup';
-    final Color statusColor = isOpen ? AppColors.green : AppColors.red;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.fromLTRB(13, 10, 13, 9),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        border: Border.all(color: AppColors.warmBorder),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Jam Operasional',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Senin – Sabtu',
-                  style: TextStyle(fontSize: 12, color: AppColors.darkGray),
-                ),
-                Text(
-                  'Minggu',
-                  style: TextStyle(fontSize: 12, color: AppColors.darkGray),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              const Text('06:00 – 21:00', style: TextStyle(fontSize: 13)),
-              const SizedBox(height: 4),
-              Text(
-                statusText,
-                style: TextStyle(fontSize: 12, color: statusColor),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }
@@ -539,87 +593,99 @@ class _ReviewCard extends StatelessWidget {
   const _ReviewCard({
     required this.initial,
     required this.name,
+    required this.rating,
     required this.time,
-    required this.text,
-    this.orange = false,
-    this.blue = false,
-    this.rating = '5.0',
+    required this.message,
+    required this.color,
   });
 
   final String initial;
   final String name;
-  final String time;
-  final String text;
   final String rating;
-  final bool orange;
-  final bool blue;
+  final String time;
+  final String message;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
+      constraints: const BoxConstraints(minHeight: 64),
+      padding: const EdgeInsets.fromLTRB(9, 8, 9, 8),
       decoration: BoxDecoration(
         color: AppColors.white,
         border: Border.all(color: AppColors.warmBorder),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(9),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CircleAvatar(
-            radius: 17,
-            backgroundColor: blue
-                ? AppColors.blue
-                : (orange ? AppColors.orange : AppColors.navy),
+            radius: 13,
+            backgroundColor: color,
             child: Text(
               initial,
               style: const TextStyle(
                 color: AppColors.white,
-                fontSize: 14,
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 9),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
+                    Expanded(
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textDark,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                    const Spacer(),
+                    const SizedBox(width: 8),
                     Text(
                       time,
                       style: const TextStyle(
-                        fontSize: 10,
                         color: AppColors.gray,
+                        fontSize: 8.5,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '★★★★★ $rating',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.yellow,
-                  ),
+                const SizedBox(height: 1),
+                Row(
+                  children: [
+                    const Text(
+                      '★ ★ ★ ★ ★',
+                      style: TextStyle(color: AppColors.orange, fontSize: 8),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      rating,
+                      style: const TextStyle(
+                        color: AppColors.gray,
+                        fontSize: 9,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Text(
-                  text,
+                  message,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 12,
+                    color: AppColors.gray,
+                    fontSize: 10.5,
                     height: 1.25,
-                    color: AppColors.darkGray,
                   ),
                 ),
               ],

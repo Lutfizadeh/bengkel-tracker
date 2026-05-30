@@ -119,7 +119,13 @@ class TrackingPage extends StatelessWidget {
                                   width: double.infinity,
                                   height: 49,
                                   child: ElevatedButton(
-                                    onPressed: () {},
+                                    onPressed: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => const ChatDetailPage(),
+                                      ),
+                                    );
+                                  },
                                     style: ElevatedButton.styleFrom(
                                       elevation: 0,
                                       backgroundColor: AppColors.orange,
@@ -129,7 +135,7 @@ class TrackingPage extends StatelessWidget {
                                       ),
                                     ),
                                     child: const Text(
-                                      'Bayar Sekarang',
+                                      'Hubungi Mekanik',
                                       style: TextStyle(
                                         fontSize: 15.5,
                                         fontWeight: FontWeight.w700,
@@ -429,25 +435,27 @@ class _ProgressSteps extends StatelessWidget {
 
   final String status;
 
-  int get _activeStep {
+int get _activeStep {
     if (status == 'pending') return 1;
-    if (status == 'on_the_way') return 2;
-    if (status == 'service') return 3;
-    if (status == 'payment') return 4;
+    if (status == 'paid') return 2;
+    if (status == 'on_the_way') return 3;
+    if (status == 'service') return 4;
     if (status == 'done') return 5;
 
-    return 1;
+    // Karena user masuk halaman tracking setelah bayar biaya panggilan,
+    // default-nya dianggap sudah lunas.
+    return 2;
   }
 
   @override
   Widget build(BuildContext context) {
-    final steps = [
-      ('✓', 'Order'),
-      ('🔧', 'Menuju'),
-      ('🛠', 'Servis'),
-      ('💳', 'Bayar'),
-      ('✅', 'Selesai'),
-    ];
+  final steps = [
+        ('✓', 'Order'),
+        ('💳', 'Lunas'),
+        ('🔧', 'Menuju'),
+        ('🛠', 'Servis'),
+        ('✅', 'Selesai'),
+      ];
 
     return Row(
       children: List.generate(steps.length, (i) {
@@ -464,9 +472,7 @@ class _ProgressSteps extends StatelessWidget {
                       width: 28,
                       height: 28,
                       decoration: BoxDecoration(
-                        color: active && i == 0
-                            ? AppColors.orange
-                            : AppColors.white,
+                          color: active ? AppColors.orange : AppColors.white,
                         border: Border.all(
                           color:
                               active ? AppColors.orange : AppColors.warmBorder,
@@ -478,9 +484,7 @@ class _ProgressSteps extends StatelessWidget {
                           s.$1,
                           style: TextStyle(
                             fontSize: 12,
-                            color: i == 0
-                                ? AppColors.white
-                                : AppColors.orange,
+                              color: active ? AppColors.white : AppColors.orange,
                           ),
                         ),
                       ),
@@ -586,7 +590,6 @@ class _MechanicCard extends StatelessWidget {
           ),
           _IconButton(icon: Icons.chat_bubble_outline, onTap: onChat),
           const SizedBox(width: 8),
-          _IconButton(icon: Icons.call, onTap: () {}),
         ],
       ),
     );
@@ -644,14 +647,14 @@ class _CostCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Rincian Biaya',
+            'Pembayaran Panggilan',
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
           ),
           const Divider(height: 20, color: AppColors.warmBorder),
           Row(
             children: [
               const Text(
-                'Biaya dasar (servis)',
+                'Biaya panggilan mekanik',
                 style: TextStyle(fontSize: 13, color: AppColors.darkGray),
               ),
               const Spacer(),
@@ -678,6 +681,24 @@ class _CostCard extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Color(0xFFFFF4EA),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Text(
+              'Biaya servis kendaraan akan diinformasikan oleh admin setelah pengecekan mekanik selesai.',
+              style: TextStyle(
+                color: Color(0xFFC56A22),
+                fontSize: 11,
+                height: 1.35,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
