@@ -28,9 +28,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   Future<void> _loadProfile() async {
     final profile = await LocalDataService.getProfile();
-    _nameController.text = profile['name'] ?? 'Fahmii Wulidan Abdi';
-    _emailController.text = profile['email'] ?? 'fahmiwal3@gmail.com';
-    _phoneController.text = _cleanPhone(profile['phone'] ?? '857-1991-6327');
+    _nameController.text = profile['name'] ?? 'Pengguna';
+    _emailController.text = profile['email'] ?? 'pengguna@gmail.com';
+
+    // Perbaikan: Pastikan jika null atau kosong, isi dengan string kosong agar user bisa mengetik baru
+    final rawPhone = profile['phone'] ?? '';
+    _phoneController.text = rawPhone.isNotEmpty ? _cleanPhone(rawPhone) : '';
+
     _photoPath = profile['photo'] ?? '';
     if (mounted) setState(() {});
   }
@@ -161,7 +165,11 @@ class _Header extends StatelessWidget {
                   color: AppColors.white15,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.chevron_left, color: Colors.white, size: 27),
+                child: const Icon(
+                  Icons.chevron_left,
+                  color: Colors.white,
+                  size: 27,
+                ),
               ),
             ),
           ),
@@ -196,7 +204,11 @@ class _Header extends StatelessWidget {
                 ),
                 child: const Text(
                   'Simpan',
-                  style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
@@ -211,7 +223,11 @@ class _ProfilePhoto extends StatelessWidget {
   final String initials;
   final String photoPath;
   final VoidCallback onTap;
-  const _ProfilePhoto({required this.initials, required this.photoPath, required this.onTap});
+  const _ProfilePhoto({
+    required this.initials,
+    required this.photoPath,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -229,12 +245,17 @@ class _ProfilePhoto extends StatelessWidget {
                   radius: 36,
                   backgroundColor: AppColors.orange,
                   backgroundImage: _avatarImage(photoPath),
-                  child: photoPath.isEmpty
-                      ? Text(
-                          initials,
-                          style: const TextStyle(color: Colors.white, fontSize: 29, fontWeight: FontWeight.w700),
-                        )
-                      : null,
+                  child:
+                      photoPath.isEmpty
+                          ? Text(
+                            initials,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 29,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          )
+                          : null,
                 ),
               ),
               Positioned(
@@ -248,7 +269,11 @@ class _ProfilePhoto extends StatelessWidget {
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 3),
                   ),
-                  child: const Icon(Icons.camera_alt, color: Colors.white, size: 14),
+                  child: const Icon(
+                    Icons.camera_alt,
+                    color: Colors.white,
+                    size: 14,
+                  ),
                 ),
               ),
             ],
@@ -256,7 +281,11 @@ class _ProfilePhoto extends StatelessWidget {
           const SizedBox(height: 6),
           const Text(
             'Ganti Profil',
-            style: TextStyle(color: AppColors.orange, fontSize: 12, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              color: AppColors.orange,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
@@ -275,28 +304,50 @@ class _ValidatedField extends StatelessWidget {
   final TextEditingController controller;
   final IconData icon;
   final String validatorText;
-  const _ValidatedField({required this.label, required this.controller, required this.icon, required this.validatorText});
+  const _ValidatedField({
+    required this.label,
+    required this.controller,
+    required this.icon,
+    required this.validatorText,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.darkGray)),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: AppColors.darkGray,
+          ),
+        ),
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,
-          validator: (value) => value == null || value.trim().isEmpty ? validatorText : null,
+          validator:
+              (value) =>
+                  value == null || value.trim().isEmpty ? validatorText : null,
           onChanged: (_) => (context as Element).markNeedsBuild(),
           style: const TextStyle(fontSize: 13, color: AppColors.textDark),
           decoration: InputDecoration(
             filled: true,
             fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 0),
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 16,
+              horizontal: 0,
+            ),
             prefixIcon: _FieldIcon(icon: icon),
-            suffixIcon: controller.text.trim().isEmpty
-                ? null
-                : const Icon(Icons.check_circle, color: AppColors.brightGreen, size: 20),
+            suffixIcon:
+                controller.text.trim().isEmpty
+                    ? null
+                    : const Icon(
+                      Icons.check_circle,
+                      color: AppColors.brightGreen,
+                      size: 20,
+                    ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(13),
               borderSide: const BorderSide(color: AppColors.orange, width: 1.4),
@@ -329,12 +380,23 @@ class _PhoneField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Nomor HP', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.darkGray)),
+        const Text(
+          'Nomor HP',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: AppColors.darkGray,
+          ),
+        ),
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,
           keyboardType: TextInputType.phone,
-          validator: (value) => value == null || value.trim().isEmpty ? 'Nomor HP wajib diisi' : null,
+          validator:
+              (value) =>
+                  value == null || value.trim().isEmpty
+                      ? 'Nomor HP wajib diisi'
+                      : null,
           style: const TextStyle(fontSize: 13, color: AppColors.textDark),
           decoration: InputDecoration(
             filled: true,
@@ -346,7 +408,14 @@ class _PhoneField extends StatelessWidget {
               decoration: const BoxDecoration(
                 border: Border(right: BorderSide(color: AppColors.warmBorder)),
               ),
-              child: const Text('+62', style: TextStyle(color: AppColors.orange, fontSize: 13, fontWeight: FontWeight.w600)),
+              child: const Text(
+                '+62',
+                style: TextStyle(
+                  color: AppColors.orange,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(13),
@@ -380,12 +449,23 @@ class _EmailField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Email', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.darkGray)),
+        const Text(
+          'Email',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: AppColors.darkGray,
+          ),
+        ),
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,
           keyboardType: TextInputType.emailAddress,
-          validator: (value) => value == null || value.trim().isEmpty ? 'Email wajib diisi' : null,
+          validator:
+              (value) =>
+                  value == null || value.trim().isEmpty
+                      ? 'Email wajib diisi'
+                      : null,
           style: const TextStyle(fontSize: 13, color: AppColors.textDark),
           decoration: InputDecoration(
             filled: true,
@@ -394,7 +474,10 @@ class _EmailField extends StatelessWidget {
             prefixIcon: const _FieldIcon(icon: Icons.email),
             suffixIcon: TextButton(
               onPressed: () {},
-              child: const Text('Ubah', style: TextStyle(color: AppColors.orange, fontSize: 12)),
+              child: const Text(
+                'Ubah',
+                style: TextStyle(color: AppColors.orange, fontSize: 12),
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(13),
@@ -428,7 +511,9 @@ class _FieldIcon extends StatelessWidget {
     return Container(
       width: 50,
       margin: const EdgeInsets.only(right: 10),
-      decoration: const BoxDecoration(border: Border(right: BorderSide(color: AppColors.warmBorder))),
+      decoration: const BoxDecoration(
+        border: Border(right: BorderSide(color: AppColors.warmBorder)),
+      ),
       child: Center(
         child: CircleAvatar(
           radius: 11,

@@ -5,6 +5,8 @@ import 'package:dio/dio.dart'; // Tambahkan package Dio
 import '../../constants/app_colors.dart';
 import 'auth_widgets.dart';
 import 'login_page.dart';
+import '../../services/local_data_service.dart';
+import '../../services/api.dart';
 
 // Enum untuk kekuatan password
 enum PasswordStrength { empty, weak, medium, strong }
@@ -53,32 +55,18 @@ class _RegisterStep1PageState extends State<RegisterStep1Page> {
     setState(() => _isLoading = true);
 
     try {
-      // Sesuai praktik terbaik, samakan alamat IP lokal laptopmu hasil ipconfig
-      final dio = Dio(
-        BaseOptions(
-          baseUrl: "http://10.253.128.201:8000/api",
-          connectTimeout: const Duration(seconds: 10),
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-        ),
-      );
-
-      // Kirim payload data diri dasar murni ke Laravel
-      final response = await dio.post(
+      // 2. PERBAIKAN: Gunakan ApiService.client secara langsung.
+      // Alamat dasar server dan headers otomatis terisi di latar belakang.
+      final response = await ApiService.client.post(
         '/register',
         data: {
           'name': nameCtrl.text.trim(),
-          'phone': phoneCtrl.text.replaceAll(
-            ' ',
-            '',
-          ), // Bersihkan spasi dari formatter
+          'phone':
+              '+62${phoneCtrl.text.replaceAll(' ', '')}', // Merakit format kode negara secara konsisten
           'email': emailCtrl.text.trim(),
           'password': passCtrl.text,
           'password_confirmation': confirmCtrl.text,
-          'role':
-              'user', // Atur default role atau tambahkan dropdown jika diperlukan
+          'role': 'user',
         },
       );
 

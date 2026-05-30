@@ -6,6 +6,7 @@ import '../auth/auth_gate.dart';
 import 'mechanic_menu_chat_page.dart';
 import 'mechanic_home_page.dart';
 import 'mechanic_tracking_page.dart';
+import 'edit_mechanic_profile_page.dart';
 
 class MechanicProfilePage extends StatefulWidget {
   const MechanicProfilePage({super.key});
@@ -17,19 +18,78 @@ class MechanicProfilePage extends StatefulWidget {
 class _MechanicProfilePageState extends State<MechanicProfilePage> {
   bool isOnline = true;
 
-  Future<void> _logout() async {
+  String _mechanicName = 'Mekanik';
+  String _mechanicEmail = '';
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMechanicData();
+  }
+
+  Future<void> _loadMechanicData() async {
     final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _mechanicName = prefs.getString('name') ?? 'Mekanik BengkelTrack';
+        _mechanicEmail = prefs.getString('email') ?? '';
+        _isLoading = false;
+      });
+    }
+  } // <-- Tanda kurung penutup ini sekarang sudah aman kembali!
 
-    await prefs.setBool('is_logged_in', false);
-    await prefs.remove('role');
-
-    if (!mounted) return;
-
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const AuthGate()),
-      (_) => false,
+  Future<void> _actionLogout() async {
+    final konfirmasi = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text(
+              'Logout',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            content: const Text(
+              'Apakah Anda yakin ingin keluar dari akun mekanik?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text(
+                  'Batal',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text(
+                  'Logout',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
     );
+
+    if (konfirmasi == true) {
+      final prefs = await SharedPreferences.getInstance();
+
+      await prefs.setBool('is_logged_in', false);
+      await prefs.remove('role');
+      await prefs.remove('profile');
+      await prefs.remove('name');
+      await prefs.remove('email');
+
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const AuthGate()),
+          (_) => false,
+        );
+      }
+    }
   }
 
   void _showComingSoon(String title) {
@@ -41,43 +101,17 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
     );
   }
 
-  void _openLogoutDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Logout'),
-          content: const Text(
-            'Apakah Anda yakin ingin keluar dari akun mekanik?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text('Batal'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _logout();
-              },
-              child: const Text(
-                'Logout',
-                style: TextStyle(
-                  color: Colors.red,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF5F6FA),
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFFFF7043)),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       body: SafeArea(
@@ -117,7 +151,6 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
                 ),
               ],
             ),
-
             Positioned(
               left: 0,
               right: 0,
@@ -131,6 +164,9 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
   }
 
   Widget _buildHeader() {
+    final String initialLetter =
+        _mechanicName.isNotEmpty ? _mechanicName.trim()[0].toUpperCase() : 'M';
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(18, 40, 18, 24),
@@ -155,13 +191,11 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
               ),
             ),
           ),
-
           Column(
             children: [
               Row(
                 children: [
                   const SizedBox(width: 34),
-
                   const Expanded(
                     child: Center(
                       child: Text(
@@ -175,7 +209,6 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
                       ),
                     ),
                   ),
-
                   SizedBox(
                     width: 34,
                     height: 34,
@@ -184,9 +217,7 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
                       shape: const CircleBorder(),
                       child: InkWell(
                         customBorder: const CircleBorder(),
-                        onTap: () {
-                          _showComingSoon('Pengaturan');
-                        },
+                        onTap: () => _showComingSoon('Pengaturan'),
                         child: const Icon(
                           Icons.settings,
                           color: Colors.white70,
@@ -197,9 +228,7 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 12),
-
               Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -214,10 +243,10 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
                         width: 3,
                       ),
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Text(
-                        'P',
-                        style: TextStyle(
+                        initialLetter,
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 34,
                           fontWeight: FontWeight.w800,
@@ -225,7 +254,6 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
                       ),
                     ),
                   ),
-
                   Positioned(
                     right: -3,
                     bottom: 5,
@@ -244,7 +272,6 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
                       ),
                     ),
                   ),
-
                   Positioned(
                     left: -3,
                     bottom: 5,
@@ -265,31 +292,27 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 8),
-
-              const Text(
-                'Pak Slamet Riyadi',
-                style: TextStyle(
+              Text(
+                _mechanicName,
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-
               const SizedBox(height: 3),
-
-              const Text(
-                'MKN-20240589 · Bengkel Pak Slamet',
-                style: TextStyle(
+              Text(
+                _mechanicEmail.isNotEmpty
+                    ? _mechanicEmail
+                    : 'Mekanik BengkelTrack',
+                style: const TextStyle(
                   color: Colors.white70,
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
                 ),
               ),
-
               const SizedBox(height: 8),
-
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -300,7 +323,7 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: const Text(
-                  'Mekanik Senior · 2 tahun',
+                  'Mekanik Aktif',
                   style: TextStyle(
                     color: Color(0xFFFFD0C2),
                     fontSize: 11,
@@ -409,33 +432,33 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
     );
   }
 
-  Widget _divider() {
-    return Container(width: 1, height: 42, color: const Color(0xFFE5E7EB));
-  }
+  Widget _divider() =>
+      Container(width: 1, height: 42, color: const Color(0xFFE5E7EB));
 
   Widget _buildStatusCard() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFFAF2),
+        color: isOnline ? const Color(0xFFEFFAF2) : const Color(0xFFF3F4F6),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFD7F2DE)),
+        border: Border.all(
+          color: isOnline ? const Color(0xFFD7F2DE) : const Color(0xFFE5E7EB),
+        ),
       ),
       child: Row(
         children: [
           Container(
             width: 22,
             height: 22,
-            decoration: const BoxDecoration(
-              color: Color(0xFF22C55E),
+            decoration: BoxDecoration(
+              color:
+                  isOnline ? const Color(0xFF22C55E) : const Color(0xFF9CA3AF),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.adjust, color: Colors.white, size: 14),
           ),
-
           const SizedBox(width: 10),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -465,18 +488,13 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
               ],
             ),
           ),
-
           Switch(
             value: isOnline,
             activeColor: Colors.white,
             activeTrackColor: const Color(0xFF22C55E),
             inactiveThumbColor: Colors.white,
             inactiveTrackColor: const Color(0xFFD1D5DB),
-            onChanged: (value) {
-              setState(() {
-                isOnline = value;
-              });
-            },
+            onChanged: (value) => setState(() => isOnline = value),
           ),
         ],
       ),
@@ -499,8 +517,19 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
             bgColor: const Color(0xFFEFF1FF),
             title: 'Edit Profil',
             subtitle: 'Foto, nama, nomor HP',
-            onTap: () {
-              _showComingSoon('Edit Profil');
+            onTap: () async {
+              // Navigasi ke halaman edit profil mekanik
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const EditMechanicProfilePage(),
+                ),
+              );
+
+              // Jika kembali membawa status 'true', refresh data header profil otomatis
+              if (result == true) {
+                _loadMechanicData();
+              }
             },
           ),
           _itemDivider(),
@@ -510,9 +539,7 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
             bgColor: const Color(0xFFFFECEC),
             title: 'Keahlian & Layanan',
             subtitle: 'Motor, Mobil, Oli & Tune Up',
-            onTap: () {
-              _showComingSoon('Keahlian & Layanan');
-            },
+            onTap: () => _showComingSoon('Keahlian & Layanan'),
           ),
           _itemDivider(),
           _menuItem(
@@ -521,9 +548,7 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
             bgColor: const Color(0xFFFFF4DE),
             title: 'Jadwal Kerja',
             subtitle: 'Sen-Sab · 06:00–21:00',
-            onTap: () {
-              _showComingSoon('Jadwal Kerja');
-            },
+            onTap: () => _showComingSoon('Jadwal Kerja'),
           ),
           _itemDivider(),
           _menuItem(
@@ -532,9 +557,7 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
             bgColor: const Color(0xFFF5F1D8),
             title: 'Rekening Payout',
             subtitle: 'BCA · xxxx-xxx-1234',
-            onTap: () {
-              _showComingSoon('Rekening Payout');
-            },
+            onTap: () => _showComingSoon('Rekening Payout'),
           ),
         ],
       ),
@@ -565,9 +588,7 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
               ),
               child: Icon(icon, color: iconColor, size: 19),
             ),
-
             const SizedBox(width: 12),
-
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -592,7 +613,6 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
                 ],
               ),
             ),
-
             const Icon(Icons.chevron_right, color: Color(0xFF9CA3AF), size: 22),
           ],
         ),
@@ -600,20 +620,18 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
     );
   }
 
-  Widget _itemDivider() {
-    return Container(
-      height: 1,
-      margin: const EdgeInsets.only(left: 58),
-      color: const Color(0xFFF0F0F0),
-    );
-  }
+  Widget _itemDivider() => Container(
+    height: 1,
+    margin: const EdgeInsets.only(left: 58),
+    color: const Color(0xFFF0F0F0),
+  );
 
   Widget _buildLogoutButton() {
     return SizedBox(
       width: double.infinity,
       height: 54,
       child: ElevatedButton(
-        onPressed: _openLogoutDialog,
+        onPressed: _actionLogout,
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFFFFE1E1),
           elevation: 0,
@@ -666,33 +684,26 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
     required String label,
   }) {
     final bool active = index == 3;
-
     return GestureDetector(
       onTap: () {
         if (index == 3) return;
-
-        if (index == 0) {
+        if (index == 0)
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const MechanicHomePage()),
           );
-        }
-
-        if (index == 1) {
+        if (index == 1)
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
               builder: (_) => const MechanicTrackingPage(hasActiveOrder: true),
             ),
           );
-        }
-
-        if (index == 2) {
+        if (index == 2)
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const MechanicChatListPage()),
           );
-        }
       },
       child: SizedBox(
         width: 68,

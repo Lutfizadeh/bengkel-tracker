@@ -4,10 +4,10 @@ import 'package:http/http.dart' as http;
 import '../models/workshop.dart';
 
 class WorkshopService {
-  static const String baseUrl = 'http://10.253.128.201:8000/api';
+  static const String baseUrl = 'https://backend-qgis.onrender.com/api';
 
   static const String token =
-      '4|wuvRaIbdFCJ1DjHwa5eaodGCNaBXpI0Nd2CuZEoM642cdd4d';
+      '1|y43uz7kip6qdamMVBpFPNyLGIJf9fYp1HBV8LrrVbb167562';
 
   // =========================
   // GET NEAREST WORKSHOPS
