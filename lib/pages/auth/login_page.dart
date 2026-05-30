@@ -1,8 +1,10 @@
+import 'package:bengkel/pages/home_page.dart';
+import 'package:bengkel/pages/mechanic/mechanic_home_page.dart'; // Pastikan impor halaman mekanik ini sudah benar
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../constants/app_colors.dart';
-import 'auth_gate.dart';
 import 'auth_widgets.dart';
 import 'register_step1_page.dart';
 
@@ -15,40 +17,96 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _phoneCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
 
   bool _remember = false;
   bool _hide = true;
-
-  // customer = user biasa
-  // mechanic = mekanik
-  String _selectedRole = 'customer';
+  bool _isLoading = false;
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final prefs = await SharedPreferences.getInstance();
+    setState(() => _isLoading = true);
 
-    await prefs.setBool('is_logged_in', true);
-    await prefs.setString('role', _selectedRole);
+    try {
+      // 1. Inisialisasi Dio
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: "http://10.253.128.201:8000/api",
+          connectTimeout: const Duration(seconds: 10),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
 
-    if (!mounted) return;
+      // 2. Eksekusi Request POST Login ke Laravel (Tanpa mengirim parameter role)
+      final response = await dio.post(
+        '/login',
+        data: {'email': _emailCtrl.text.trim(), 'password': _passCtrl.text},
+      );
 
-    // Setelah login, arahkan ke AuthGate.
-    // AuthGate yang akan memilih:
-    // role customer -> HomePage
-    // role mechanic -> MechanicHomePage
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const AuthGate()),
-      (_) => false,
-    );
+      setState(() => _isLoading = false);
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        print(data);
+
+        final String token = data['access_token'];
+        final String name = data['user']['name'];
+        final String email = data['user']['email'];
+        final String role =
+            data['user']['role']
+                .toString()
+                .toLowerCase(); // Ambil role dari database
+
+        // 3. Simpan data otentikasi ke SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('is_logged_in', true);
+        await prefs.setString('access_token', token);
+        await prefs.setString('name', name);
+        await prefs.setString('email', email);
+        await prefs.setString('role', role);
+
+        if (!mounted) return;
+
+        // 4. SISTEM OTOMATIS MENENTUKAN REDIRECT BERDASARKAN ROLE DARI BACKEND
+        if (role == 'mechanic') {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const MechanicHomePage(),
+            ), // Ganti ke nama class halaman mekanikmu
+            (_) => false,
+          );
+        } else {
+          // Jika role adalah 'user', 'customer', atau default lainnya, arahkan ke HomePage
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const HomePage()),
+            (_) => false,
+          );
+        }
+      }
+    } on DioException catch (e) {
+      setState(() => _isLoading = false);
+
+      String errorMsg = "Gagal terhubung ke server.";
+      if (e.response != null && e.response?.data['message'] != null) {
+        errorMsg = e.response?.data['message'];
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMsg), backgroundColor: AppColors.red),
+      );
+    }
   }
 
   @override
   void dispose() {
-    _phoneCtrl.dispose();
+    _emailCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
   }
@@ -122,7 +180,6 @@ class _LoginPageState extends State<LoginPage> {
                 ],
               ),
             ),
-
             Expanded(
               child: Container(
                 width: double.infinity,
@@ -143,7 +200,7 @@ class _LoginPageState extends State<LoginPage> {
                         children: [
                           _label('Nomor HP / Email'),
                           TextFormField(
-                            controller: _phoneCtrl,
+                            controller: _emailCtrl,
                             onChanged: (_) => setState(() {}),
                             style: const TextStyle(color: Colors.black),
                             decoration: authInputDecoration(
@@ -152,20 +209,18 @@ class _LoginPageState extends State<LoginPage> {
                             ).copyWith(
                               hintStyle: TextStyle(
                                 color:
-                                    _phoneCtrl.text.trim().isEmpty
+                                    _emailCtrl.text.trim().isEmpty
                                         ? AppColors.gray
                                         : Colors.black,
                               ),
                             ),
                             validator:
                                 (v) =>
-                                    v == null || v.isEmpty
-                                        ? 'Wajib diisi'
+                                    v == null || v.trim().isEmpty
+                                        ? 'Nomor HP atau email wajib diisi'
                                         : null,
                           ),
-
                           const SizedBox(height: 12),
-
                           _label('Password'),
                           TextFormField(
                             controller: _passCtrl,
@@ -182,11 +237,7 @@ class _LoginPageState extends State<LoginPage> {
                                       : Icons.visibility,
                                   color: Colors.grey,
                                 ),
-                                onPressed: () {
-                                  setState(() {
-                                    _hide = !_hide;
-                                  });
-                                },
+                                onPressed: () => setState(() => _hide = !_hide),
                               ),
                             ).copyWith(
                               hintStyle: TextStyle(
@@ -202,18 +253,14 @@ class _LoginPageState extends State<LoginPage> {
                                         ? 'Password minimal 8 karakter'
                                         : null,
                           ),
-
                           const SizedBox(height: 16),
-
                           Row(
                             children: [
                               Checkbox(
                                 value: _remember,
-                                onChanged: (v) {
-                                  setState(() {
-                                    _remember = v ?? false;
-                                  });
-                                },
+                                onChanged:
+                                    (v) =>
+                                        setState(() => _remember = v ?? false),
                                 activeColor: AppColors.orange,
                                 materialTapTargetSize:
                                     MaterialTapTargetSize.shrinkWrap,
@@ -236,45 +283,19 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             ],
                           ),
-
-                          const SizedBox(height: 12),
-
-                          _label('Masuk Sebagai'),
-
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _roleButton(
-                                  title: 'User',
-                                  value: 'customer',
-                                  icon: Icons.person,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: _roleButton(
-                                  title: 'Mekanik',
-                                  value: 'mechanic',
-                                  icon: Icons.engineering,
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 20),
-
+                          const SizedBox(
+                            height: 24,
+                          ), // Jarak disesuaikan karena tombol role dihapus
                           OrangeButton(
-                            text: 'Masuk',
-                            onTap: _login,
+                            text: _isLoading ? 'Memproses...' : 'Masuk',
+                            onTap: _isLoading ? () {} : _login,
                             textStyle: const TextStyle(
                               fontFamily: 'PlusJakartaSans',
                               fontSize: 15,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-
                           const SizedBox(height: 16),
-
                           Center(
                             child: GestureDetector(
                               onTap: () {
@@ -316,78 +337,27 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _roleButton({
-    required String title,
-    required String value,
-    required IconData icon,
-  }) {
-    final bool active = _selectedRole == value;
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedRole = value;
-        });
-      },
-      child: Container(
-        height: 46,
-        decoration: BoxDecoration(
-          color: active ? AppColors.orange : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: active ? AppColors.orange : const Color(0xFFE6E1DA),
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: active ? Colors.white : AppColors.darkGray,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              title,
-              style: TextStyle(
-                color: active ? Colors.white : AppColors.darkGray,
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
+  Widget _label(String s) => Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Text(
+      s,
+      style: const TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+        color: AppColors.darkGray,
       ),
-    );
-  }
-
-  Widget _label(String s) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Text(
-        s,
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: AppColors.darkGray,
-        ),
-      ),
-    );
-  }
+    ),
+  );
 }
 
 class _HeaderCircle extends StatelessWidget {
   final double size;
   final Color color;
-
   const _HeaderCircle({required this.size, required this.color});
-
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-    );
-  }
+  Widget build(BuildContext context) => Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+  );
 }

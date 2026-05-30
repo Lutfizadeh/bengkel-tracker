@@ -8,7 +8,12 @@ class RegisterStep2Page extends StatefulWidget {
   final String name;
   final String phone;
   final String email;
-  const RegisterStep2Page({super.key, required this.name, required this.phone, required this.email});
+  const RegisterStep2Page({
+    super.key,
+    required this.name,
+    required this.phone,
+    required this.email,
+  });
 
   @override
   State<RegisterStep2Page> createState() => _RegisterStep2PageState();
@@ -42,7 +47,107 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
-    Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => VerificationSuccessPage(name: widget.name, phone: widget.phone, email: widget.email)), (_) => false);
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder:
+            (_) => VerificationSuccessPage(
+              name: widget.name,
+              phone: widget.phone,
+              email: widget.email,
+            ),
+      ),
+      (_) => false,
+    );
+  }
+
+  void _showSuccessDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible:
+          false, // User wajib klik tombol, tidak bisa asal klik di luar skrin
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(
+              18,
+            ), // Sesuai dengan border radius card bawaanmu
+          ),
+          backgroundColor: Colors.white,
+          title: Column(
+            children: [
+              const Icon(
+                Icons.check_circle_rounded,
+                color:
+                    AppColors
+                        .brightGreen, // Menggunakan konstanta warna milikmu
+                size: 64,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Pendaftaran Berhasil',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'Syne', // Konsisten dengan font header halaman
+                  fontWeight: FontWeight.w600,
+                  fontSize: 20,
+                  color: AppColors.navy,
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Akun Bengkel Tracker kamu telah berhasil dibuat. Silakan masuk untuk mulai menggunakan layanan.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'PlusJakartaSans',
+              fontSize: 13,
+              color: AppColors.darkGray,
+            ),
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [
+            SizedBox(
+              width:
+                  double
+                      .infinity, // Membuat tombol lebar penuh agar mudah ditekan di HP
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: OrangeButton(
+                  // Menggunakan widget tombol kustom bawaan proyekmu
+                  text: 'Masuk Sekarang',
+                  onTap: () {
+                    // 1. Tutup pop-up dialog terlebih dahulu
+                    Navigator.of(context).pop();
+
+                    // 2. Alihkan ke halaman sukses bawaanmu atau langsung ke LoginPage
+                    // Menggunakan pushAndRemoveUntil agar tumpukan backstack register bersih total
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (_) => VerificationSuccessPage(
+                              name: widget.name,
+                              phone: widget.phone,
+                              email: widget.email,
+                            ),
+                      ),
+                      (_) => false,
+                    );
+                  },
+                  textStyle: const TextStyle(
+                    fontFamily: 'PlusJakartaSans',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -51,10 +156,19 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
       lightBottom: true,
       child: SafeArea(
         bottom: false,
-        child: Column(children: [
-          _header(context),
-          Expanded(child: Container(width: double.infinity, color: const Color(0xFFF9F8F6), padding: const EdgeInsets.fromLTRB(16, 12, 16, 0), child: _card())),
-        ]),
+        child: Column(
+          children: [
+            _header(context),
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                color: const Color(0xFFF9F8F6),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: _card(),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -80,41 +194,70 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 18),
-          child: Column(children: [
-            const SizedBox(height: 18),
-            Row(children: [
-              GestureDetector(onTap: () => Navigator.pop(context), child: Container(width: 30, height: 30, decoration: BoxDecoration(color: Colors.white.withOpacity(.12), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 16))),
-              const Spacer(),
-              const SizedBox(width: 30),
-            ]),
-            const SizedBox(height: 10),
-            const Align(
-              alignment: Alignment.center,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
+          child: Column(
+            children: [
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.arrow_back_ios_new,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  const SizedBox(width: 30),
+                ],
+              ),
+              const SizedBox(height: 10),
+              const Align(
                 alignment: Alignment.center,
-                child: Text(
-                  'Data Kendaraan',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontFamily: 'Syne',
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 19,
-                    height: 0.95,
-                    letterSpacing: 0,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.center,
+                  child: Text(
+                    'Data Kendaraan',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: 'Syne',
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 19,
+                      height: 0.95,
+                      letterSpacing: 0,
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 14),
-            Container(height: 5, margin: const EdgeInsets.symmetric(horizontal: 42), decoration: BoxDecoration(color: AppColors.orange, borderRadius: BorderRadius.circular(5))),
-            const SizedBox(height: 16),
-            Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: const [
-              _StepDone(label: 'Data Diri'),
-              _StepActive(label: 'Kendaraan'),
-            ]),
-          ]),
+              const SizedBox(height: 14),
+              Container(
+                height: 5,
+                margin: const EdgeInsets.symmetric(horizontal: 42),
+                decoration: BoxDecoration(
+                  color: AppColors.orange,
+                  borderRadius: BorderRadius.circular(5),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: const [
+                  _StepDone(label: 'Data Diri'),
+                  _StepActive(label: 'Kendaraan'),
+                ],
+              ),
+            ],
+          ),
         ),
       ],
     ),
@@ -122,142 +265,153 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
 
   Widget _card() => Container(
     padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE6E1DA))),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: const Color(0xFFE6E1DA)),
+    ),
     child: Form(
       key: _formKey,
       child: SingleChildScrollView(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _label('Jenis Kendaraan *'),
-          Row(
-            children: [
-              _VehicleOption(
-                label: 'Motor',
-                icon: Icons.two_wheeler,
-                selected: vehicle == 'Motor',
-                onTap: () => setState(() => vehicle = 'Motor'),
-              ),
-              const SizedBox(width: 8),
-              _VehicleOption(
-                label: 'Mobil',
-                icon: Icons.directions_car,
-                selected: vehicle == 'Mobil',
-                onTap: () => setState(() => vehicle = 'Mobil'),
-              ),
-              const SizedBox(width: 8),
-              _VehicleOption(
-                label: 'Truk/Bus',
-                icon: Icons.local_shipping,
-                selected: vehicle == 'Truk/Bus',
-                onTap: () => setState(() => vehicle = 'Truk/Bus'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          _label('Merk *'),
-          TextFormField(
-            controller: brandCtrl,
-            onChanged: (_) => setState(() {}),
-            decoration: _hintDecoration(
-              hint: _brandHint(),
-              icon: _vehicleFieldIcon(),
-              suffixIcon: _fieldCheckIcon(brandCtrl.text.trim().isNotEmpty),
-              hasText: brandCtrl.text.trim().isNotEmpty,
-            ),
-            validator: _required,
-          ),
-          const SizedBox(height: 8),
-          _label('Model *'),
-          TextFormField(
-            controller: modelCtrl,
-            onChanged: (_) => setState(() {},),
-            decoration: _hintDecoration(
-              hint: _modelHint(),
-              icon: _vehicleFieldIcon(),
-              suffixIcon: _fieldCheckIcon(modelCtrl.text.trim().isNotEmpty),
-              hasText: modelCtrl.text.trim().isNotEmpty,
-            ),
-            validator: _required,
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _label('Tahun *'),
-                    TextFormField(
-                      controller: yearCtrl,
-                      onChanged: (_) => setState(() {}),
-                      keyboardType: TextInputType.number,
-                      decoration: _hintDecoration(
-                        hint: 'Isi Tahun Kendaraan (misal: 2010)',
-                        icon: Icons.calendar_month,
-                        hasText: yearCtrl.text.trim().isNotEmpty,
-                      ),
-                      validator: _required,
-                    ),
-                  ],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _label('Jenis Kendaraan *'),
+            Row(
+              children: [
+                _VehicleOption(
+                  label: 'Motor',
+                  icon: Icons.two_wheeler,
+                  selected: vehicle == 'Motor',
+                  onTap: () => setState(() => vehicle = 'Motor'),
                 ),
+                const SizedBox(width: 8),
+                _VehicleOption(
+                  label: 'Mobil',
+                  icon: Icons.directions_car,
+                  selected: vehicle == 'Mobil',
+                  onTap: () => setState(() => vehicle = 'Mobil'),
+                ),
+                const SizedBox(width: 8),
+                _VehicleOption(
+                  label: 'Truk/Bus',
+                  icon: Icons.local_shipping,
+                  selected: vehicle == 'Truk/Bus',
+                  onTap: () => setState(() => vehicle = 'Truk/Bus'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            _label('Merk *'),
+            TextFormField(
+              controller: brandCtrl,
+              onChanged: (_) => setState(() {}),
+              decoration: _hintDecoration(
+                hint: _brandHint(),
+                icon: _vehicleFieldIcon(),
+                suffixIcon: _fieldCheckIcon(brandCtrl.text.trim().isNotEmpty),
+                hasText: brandCtrl.text.trim().isNotEmpty,
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _label('Warna'),
-                    TextFormField(
-                      controller: colorCtrl,
-                      onChanged: (_) => setState(() {}),
-                      decoration: _hintDecoration(
-                        hint: 'Tuliskan warna kendaraan',
-                        icon: Icons.circle,
-                        prefix: Padding(
-                          padding: const EdgeInsets.only(left: 14, right: 8),
-                          child: Center(
-                            widthFactor: 1,
-                            child: CircleAvatar(
-                              radius: 10,
-                              backgroundColor: _colorForName(colorCtrl.text),
+              validator: _required,
+            ),
+            const SizedBox(height: 8),
+            _label('Model *'),
+            TextFormField(
+              controller: modelCtrl,
+              onChanged: (_) => setState(() {}),
+              decoration: _hintDecoration(
+                hint: _modelHint(),
+                icon: _vehicleFieldIcon(),
+                suffixIcon: _fieldCheckIcon(modelCtrl.text.trim().isNotEmpty),
+                hasText: modelCtrl.text.trim().isNotEmpty,
+              ),
+              validator: _required,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _label('Tahun *'),
+                      TextFormField(
+                        controller: yearCtrl,
+                        onChanged: (_) => setState(() {}),
+                        keyboardType: TextInputType.number,
+                        decoration: _hintDecoration(
+                          hint: 'Isi Tahun Kendaraan (misal: 2010)',
+                          icon: Icons.calendar_month,
+                          hasText: yearCtrl.text.trim().isNotEmpty,
+                        ),
+                        validator: _required,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _label('Warna'),
+                      TextFormField(
+                        controller: colorCtrl,
+                        onChanged: (_) => setState(() {}),
+                        decoration: _hintDecoration(
+                          hint: 'Tuliskan warna kendaraan',
+                          icon: Icons.circle,
+                          prefix: Padding(
+                            padding: const EdgeInsets.only(left: 14, right: 8),
+                            child: Center(
+                              widthFactor: 1,
+                              child: CircleAvatar(
+                                radius: 10,
+                                backgroundColor: _colorForName(colorCtrl.text),
+                              ),
                             ),
                           ),
+                          hasText: colorCtrl.text.trim().isNotEmpty,
                         ),
-                        hasText: colorCtrl.text.trim().isNotEmpty,
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          _label('Nomor Polisi *'),
-          Row(
-            children: [
-              SizedBox(width: 56, child: _platePrefixField()),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextFormField(
-                  controller: plateCtrl,
-                  onChanged: (_) => setState(() {}),
-                  decoration: _hintDecoration(
-                    hint: '5555 TLD',
-                    icon: Icons.confirmation_number,
-                    hasText: plateCtrl.text.trim().isNotEmpty,
+                    ],
                   ),
-                  validator: _required,
                 ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _label('Nomor Polisi *'),
+            Row(
+              children: [
+                SizedBox(width: 56, child: _platePrefixField()),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextFormField(
+                    controller: plateCtrl,
+                    onChanged: (_) => setState(() {}),
+                    decoration: _hintDecoration(
+                      hint: '5555 TLD',
+                      icon: Icons.confirmation_number,
+                      hasText: plateCtrl.text.trim().isNotEmpty,
+                    ),
+                    validator: _required,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            OrangeButton(
+              text: 'Masuk',
+              onTap: _submit,
+              textStyle: const TextStyle(
+                fontFamily: 'PlusJakartaSans',
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          OrangeButton(
-            text: 'Masuk',
-            onTap: _submit,
-            textStyle: const TextStyle(fontFamily: 'PlusJakartaSans', fontSize: 15, fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 56),
-        ]),
+            ),
+            const SizedBox(height: 56),
+          ],
+        ),
       ),
     ),
   );
@@ -268,14 +422,20 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
     Widget? prefix,
     required bool hasText,
   }) {
-    return authInputDecoration(hint: hint, icon: icon, suffixIcon: suffixIcon, prefix: prefix).copyWith(
-      hintStyle: TextStyle(
-        color: hasText ? Colors.black : AppColors.gray,
-      ),
+    return authInputDecoration(
+      hint: hint,
+      icon: icon,
+      suffixIcon: suffixIcon,
+      prefix: prefix,
+    ).copyWith(
+      hintStyle: TextStyle(color: hasText ? Colors.black : AppColors.gray),
     );
   }
 
-  Widget? _fieldCheckIcon(bool show) => show ? const Icon(Icons.check_circle, color: AppColors.brightGreen) : null;
+  Widget? _fieldCheckIcon(bool show) =>
+      show
+          ? const Icon(Icons.check_circle, color: AppColors.brightGreen)
+          : null;
 
   IconData _vehicleFieldIcon() {
     switch (vehicle) {
@@ -317,13 +477,17 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
       maxLength: 2,
       onChanged: (_) => setState(() {}),
       style: TextStyle(
-        color: platePrefixCtrl.text.trim().isEmpty ? AppColors.gray : Colors.white,
+        color:
+            platePrefixCtrl.text.trim().isEmpty ? AppColors.gray : Colors.white,
         fontWeight: FontWeight.w700,
       ),
       decoration: InputDecoration(
         counterText: '',
         filled: true,
-        fillColor: platePrefixCtrl.text.trim().isEmpty ? const Color(0xFFF8F7F5) : AppColors.navy,
+        fillColor:
+            platePrefixCtrl.text.trim().isEmpty
+                ? const Color(0xFFF8F7F5)
+                : AppColors.navy,
         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 15),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -334,7 +498,10 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
           borderSide: const BorderSide(color: AppColors.orange, width: 1.4),
         ),
         hintText: 'S',
-        hintStyle: const TextStyle(color: AppColors.gray, fontWeight: FontWeight.w700),
+        hintStyle: const TextStyle(
+          color: AppColors.gray,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -374,7 +541,17 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
   }
 
   String? _required(String? v) => v == null || v.isEmpty ? 'Wajib diisi' : null;
-  Widget _label(String s) => Padding(padding: const EdgeInsets.only(bottom: 5), child: Text(s, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.darkGray)));
+  Widget _label(String s) => Padding(
+    padding: const EdgeInsets.only(bottom: 5),
+    child: Text(
+      s,
+      style: const TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+        color: AppColors.darkGray,
+      ),
+    ),
+  );
 }
 
 class _VehicleOption extends StatelessWidget {
@@ -383,7 +560,12 @@ class _VehicleOption extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  const _VehicleOption({required this.label, required this.icon, required this.selected, required this.onTap});
+  const _VehicleOption({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -401,13 +583,21 @@ class _VehicleOption extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 18, color: selected ? Colors.white : AppColors.gray),
+              Icon(
+                icon,
+                size: 18,
+                color: selected ? Colors.white : AppColors.gray,
+              ),
               const SizedBox(height: 4),
               FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
                   label,
-                  style: TextStyle(fontSize: 11.5, color: selected ? Colors.white : AppColors.gray, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: selected ? Colors.white : AppColors.gray,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
@@ -418,8 +608,64 @@ class _VehicleOption extends StatelessWidget {
   }
 }
 
-class _StepDone extends StatelessWidget { final String label; const _StepDone({required this.label}); @override Widget build(BuildContext context) => Column(children: [const CircleAvatar(radius: 14, backgroundColor: AppColors.brightGreen, child: Icon(Icons.check, color: Colors.white, size: 18)), const SizedBox(height: 2), Text(label, style: const TextStyle(fontSize: 10.5, color: AppColors.brightGreen, fontFamily: 'PlusJakartaSans', fontWeight: FontWeight.w400))]); }
-class _StepActive extends StatelessWidget { final String label; const _StepActive({required this.label}); @override Widget build(BuildContext context) => Column(children: [const CircleAvatar(radius: 14, backgroundColor: AppColors.orange, child: Text('2', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700, fontFamily: 'PlusJakartaSans'))), const SizedBox(height: 2), Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10.5, color: AppColors.orange, fontFamily: 'Syne', fontWeight: FontWeight.w600))]); }
+class _StepDone extends StatelessWidget {
+  final String label;
+  const _StepDone({required this.label});
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      const CircleAvatar(
+        radius: 14,
+        backgroundColor: AppColors.brightGreen,
+        child: Icon(Icons.check, color: Colors.white, size: 18),
+      ),
+      const SizedBox(height: 2),
+      Text(
+        label,
+        style: const TextStyle(
+          fontSize: 10.5,
+          color: AppColors.brightGreen,
+          fontFamily: 'PlusJakartaSans',
+          fontWeight: FontWeight.w400,
+        ),
+      ),
+    ],
+  );
+}
+
+class _StepActive extends StatelessWidget {
+  final String label;
+  const _StepActive({required this.label});
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      const CircleAvatar(
+        radius: 14,
+        backgroundColor: AppColors.orange,
+        child: Text(
+          '2',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            fontFamily: 'PlusJakartaSans',
+          ),
+        ),
+      ),
+      const SizedBox(height: 2),
+      Text(
+        label,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          fontSize: 10.5,
+          color: AppColors.orange,
+          fontFamily: 'Syne',
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    ],
+  );
+}
 
 class _HeaderCircle extends StatelessWidget {
   final double size;

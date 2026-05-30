@@ -1,14 +1,51 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/app_assets.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_text_styles.dart';
 
-class HomeHero extends StatelessWidget {
+class HomeHero extends StatefulWidget {
   const HomeHero({super.key});
 
   @override
+  State<HomeHero> createState() => _HomeHeroState();
+}
+
+class _HomeHeroState extends State<HomeHero> {
+  String _name =
+      'Pengguna'; // Nilai default sebelum data dari memori internal terbaca
+  String _role = 'user';
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  // Fungsi async untuk menangkap data nama dan role hasil login tadi
+  Future<void> _loadUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _name = prefs.getString('name') ?? 'Pengguna';
+      _role = prefs.getString('role') ?? 'user';
+      _isLoading = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Jika data SharedPreferences masih dibaca, beri widget kosong atau placeholder halus
+    if (_isLoading) {
+      return const SizedBox(
+        height: 220,
+        child: Center(
+          child: CircularProgressIndicator(color: AppColors.orange),
+        ),
+      );
+    }
+
     return SizedBox(
       height: 220,
       width: double.infinity,
@@ -60,17 +97,21 @@ class HomeHero extends StatelessWidget {
               ),
             ),
           ),
-          const Positioned(
+          Positioned(
             left: 20,
             top: 116,
-            child: Text('Halo, fahmi!', style: AppTextStyles.body),
+            // Menampilkan nama dinamis berdasarkan akun yang sukses terautentikasi
+            child: Text(
+              'Halo, ${_name.toUpperCase()}!',
+              style: AppTextStyles.body,
+            ),
           ),
-          const Positioned(
+          Positioned(
             left: 20,
             top: 135,
             child: Text(
-              'Butuh Bantuan Mekanik?',
-              style: TextStyle(
+              "Butuh Bantuan Mekanik?",
+              style: const TextStyle(
                 color: AppColors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
