@@ -1,22 +1,198 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../services/api.dart';
+
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 import 'mechanic_chat_page.dart';
 
 import '../../constants/app_colors.dart';
 
-  class MechanicTrackingPage extends StatelessWidget {
+class MechanicTrackingPage extends StatefulWidget {
   final bool hasActiveOrder;
+  final int orderId;
 
-  const MechanicTrackingPage({super.key, this.hasActiveOrder = true});
+  const MechanicTrackingPage({
+    super.key,
+    this.hasActiveOrder = true,
+    this.orderId = 1,
+  });
+
+  @override
+  State<MechanicTrackingPage> createState() => _MechanicTrackingPageState();
+}
+
+class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
+  // Controller untuk menggerakkan peta
+  final MapController _mapController = MapController();
+  
+  // Stream untuk memantau pergerakan GPS
+  StreamSubscription<Position>? _positionStream;
+
+  Map<String, dynamic>? _orderData;
+  LatLng? _customerPosition;
+  LatLng? _mechanicPosition;
+
+  bool _isLoading = true;
+  String _distanceText = 'Menghitung...';
+  String _etaText = '...';
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeTracking();
+  }
+
+  @override
+  void dispose() {
+    // Wajib dimatikan agar GPS tidak terus menyala di background
+    _positionStream?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initializeTracking() async {
+    try {
+      // 1. Ambil data order (Posisi Pelanggan) dari API
+      final response = await ApiService.client.get(
+        '/orders/${widget.orderId}/tracking',
+      );
+
+      final data = response.data['data'];
+      _orderData = data;
+      _customerPosition = LatLng(
+        double.parse(data['user_latitude'].toString()),
+        double.parse(data['user_longitude'].toString()),
+      );
+
+      // 2. Mulai Lacak GPS Mekanik
+      await _startLocationTracking();
+    } catch (e) {
+      debugPrint('Error loading data: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _startLocationTracking() async {
+    // Cek status dan izin GPS
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return;
+    }
+
+    if (permission == LocationPermission.deniedForever) return;
+
+    // Ambil lokasi awal
+    Position initialPosition = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+    _updateTrackingInfo(initialPosition);
+
+    // Pantau pergerakan (Real-time update)
+    _positionStream = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 5, // Update jika bergerak 5 meter
+      ),
+    ).listen((Position position) {
+      _updateTrackingInfo(position);
+    });
+  }
+
+  void _updateTrackingInfo(Position position) {
+
+    _sendLocationToServer(
+      position.latitude,
+      position.longitude,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _mechanicPosition = LatLng(position.latitude, position.longitude);
+
+      // Otomatis geser peta mengikuti mekanik
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _mapController.move(
+          _mechanicPosition!,
+          16.0,
+        );
+      });
+
+      // Hitung Jarak
+      if (_customerPosition != null) {
+        final distanceInMeters = Geolocator.distanceBetween(
+          position.latitude,
+          position.longitude,
+          _customerPosition!.latitude,
+          _customerPosition!.longitude,
+        );
+
+        // Format Jarak
+        if (distanceInMeters >= 1000) {
+          _distanceText = '${(distanceInMeters / 1000).toStringAsFixed(1)} km';
+        } else {
+          _distanceText = '${distanceInMeters.round()} m';
+        }
+
+        // Estimasi Waktu (Asumsi kecepatan rata-rata 30 km/jam)
+        double speedKmh = 30.0;
+        double hours = (distanceInMeters / 1000) / speedKmh;
+        int minutes = (hours * 60).round();
+
+        if (minutes < 1) {
+          _etaText = 'Kurang dari 1 menit';
+        } else {
+          _etaText = '$minutes menit';
+        }
+      }
+    });
+  }
+
+  Future<void> _sendLocationToServer(
+    double lat,
+    double lng,
+  ) async {
+    try {
+
+      final response = await ApiService.client.patch(
+        '/mechanics/${_orderData?['mechanic_id']}/location',
+        data: {
+          'lat': lat,
+          'lng': lng,
+        },
+      );
+
+      print(response.statusCode);
+      print(response.data);
+
+    } catch (e) {
+      print(e);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (!hasActiveOrder) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_orderData == null || _customerPosition == null || _mechanicPosition == null) {
       return _buildEmptyTrackingPage(context);
     }
-    final LatLng mechanicPosition = LatLng(-7.1187, 112.4215);
-    final LatLng customerPosition = LatLng(-7.1129, 112.4238);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FA),
@@ -24,36 +200,38 @@ import '../../constants/app_colors.dart';
         children: [
           Positioned.fill(
             child: FlutterMap(
+              mapController: _mapController, // Tambahkan controller
               options: MapOptions(
-                initialCenter: mechanicPosition,
-                initialZoom: 15.5,
+                initialCenter: _mechanicPosition!, // Center ke mekanik
+                initialZoom: 16,
               ),
               children: [
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.example.bengkel_track',
                 ),
 
                 PolylineLayer(
                   polylines: [
                     Polyline(
-                      points: [mechanicPosition, customerPosition],
+                      points: [
+                        _mechanicPosition!,
+                        _customerPosition!,
+                      ],
                       strokeWidth: 5,
                       color: Colors.blue,
                     ),
                   ],
                 ),
-
                 MarkerLayer(
                   markers: [
                     Marker(
-                      point: mechanicPosition,
+                      point: _mechanicPosition!,
                       width: 46,
                       height: 46,
                       child: _buildMechanicMarker(),
                     ),
                     Marker(
-                      point: customerPosition,
+                      point: _customerPosition!,
                       width: 46,
                       height: 46,
                       child: _buildCustomerMarker(),
@@ -63,21 +241,23 @@ import '../../constants/app_colors.dart';
               ],
             ),
           ),
-
-          Positioned(left: 0, right: 0, top: 0, child: _buildHeader(context)),
-
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            child: _buildHeader(context),
+          ),
           Positioned(
             left: 16,
             right: 16,
             top: 92,
-            child: _buildOrderInfoCard(),
+            child: _buildOrderInfoCard(_orderData!),
           ),
-
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            child: _buildBottomSheet(context),
+            child: _buildBottomSheet(context, _orderData!),
           ),
         ],
       ),
@@ -265,7 +445,7 @@ import '../../constants/app_colors.dart';
     );
   }
 
-  Widget _buildOrderInfoCard() {
+  Widget _buildOrderInfoCard(Map<String, dynamic> data) {
     return Container(
       padding: const EdgeInsets.fromLTRB(15, 12, 15, 13),
       decoration: BoxDecoration(
@@ -283,10 +463,10 @@ import '../../constants/app_colors.dart';
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  '#ORD-20240521-001',
-                  style: TextStyle(
+                  '#${data['order_code']}',
+                  style: const TextStyle(
                     color: Color(0xFF111827),
                     fontSize: 13,
                     fontWeight: FontWeight.w900,
@@ -313,23 +493,23 @@ import '../../constants/app_colors.dart';
           const SizedBox(height: 8),
           Container(height: 1, color: const Color(0xFFE5E7EB)),
           const SizedBox(height: 10),
-          const Row(
+          Row(
             children: [
               Expanded(
                 child: Text(
-                  'Budi Speed',
-                  style: TextStyle(
+                  data['user_name'] ?? '',
+                  style: const TextStyle(
                     color: Color(0xFF374151),
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
-              Icon(Icons.location_on, color: Colors.red, size: 13),
-              SizedBox(width: 4),
+              const Icon(Icons.location_on, color: Colors.red, size: 13),
+              const SizedBox(width: 4),
               Text(
-                'Jl. Lamongrejo No.22',
-                style: TextStyle(
+                '${data['user_latitude']}, ${data['user_longitude']}',
+                style: const TextStyle(
                   color: Color(0xFF374151),
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
@@ -338,11 +518,11 @@ import '../../constants/app_colors.dart';
             ],
           ),
           const SizedBox(height: 4),
-          const Align(
+          Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              '0812-3456-7890',
-              style: TextStyle(
+              data['user_phone'] ?? '',
+              style: const TextStyle(
                 color: Color(0xFF6B7280),
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
@@ -354,7 +534,10 @@ import '../../constants/app_colors.dart';
     );
   }
 
-  Widget _buildBottomSheet(BuildContext context) {
+  Widget _buildBottomSheet(
+    BuildContext context,
+    Map<String, dynamic> data,
+  ) {
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 26),
       decoration: const BoxDecoration(
@@ -379,11 +562,11 @@ import '../../constants/app_colors.dart';
             ),
           ),
           const SizedBox(height: 4),
-          const Align(
+          Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              'ETA 12 menit • 3.2 km',
-              style: TextStyle(
+              'ETA $_etaText • $_distanceText', // Update text menggunakan State
+              style: const TextStyle(
                 color: Color(0xFF6B7280),
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -395,8 +578,28 @@ import '../../constants/app_colors.dart';
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
-              onPressed: () {
-                // nanti aksi ketika mekanik sudah sampai
+              onPressed: () async {
+                try {
+                  final response = await ApiService.client.post(
+                    '/orders/${widget.orderId}/arrive',
+                  );
+
+                  if (response.statusCode == 200) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Mekanik tiba di lokasi'),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  debugPrint('ERROR ARRIVE: $e');
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Gagal update status: $e'),
+                    ),
+                  );
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF16A34A),
@@ -415,7 +618,46 @@ import '../../constants/app_colors.dart';
               ),
             ),
           ),
-        const SizedBox(height: 10),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              onPressed: () async {
+                try {
+                  final response = await ApiService.client.post(
+                    '/orders/${widget.orderId}/complete',
+                  );
+
+                  if (response.statusCode == 200) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Servis selesai'),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  debugPrint('ERROR COMPLETE: $e');
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text(
+                'Selesai Servis',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
             height: 44,
@@ -424,11 +666,10 @@ import '../../constants/app_colors.dart';
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder:
-                        (_) => const MechanicChatPage(
-                          customerName: 'Budi Speed',
-                          orderId: '#ORD-20240521-001',
-                        ),
+                    builder: (_) => MechanicChatPage(
+                      customerName: data['user_name'] ?? '',
+                      orderId: widget.orderId.toString(),
+                    ),
                   ),
                 );
               },

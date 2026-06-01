@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-
+import '../../services/api.dart';
+import 'package:dio/dio.dart';
 import '../../constants/app_colors.dart';
 import 'mechanic_tracking_page.dart';
 import 'mechanic_menu_chat_page.dart';
@@ -15,6 +16,33 @@ class MechanicHomePage extends StatefulWidget {
 
 class _MechanicHomePageState extends State<MechanicHomePage> {
   int activeIndex = 0;
+  List<dynamic> orders = [];
+  bool isLoading = true;
+  
+  @override
+  void initState() {
+    super.initState();
+    loadOrders();
+  }
+
+  Future<void> loadOrders() async {
+    try {
+      final response = await ApiService.client.get(
+        '/mechanic/orders',
+      );
+
+      setState(() {
+        orders = response.data['data'];
+        isLoading = false;
+      });
+    } catch (e) {
+      print(e);
+
+      setState(() {
+        isLoading = false;
+      });
+    }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -31,36 +59,34 @@ class _MechanicHomePageState extends State<MechanicHomePage> {
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 24, 16, 95),
-                    child: Column(
-                      children: [
-                        _buildOrderCard(
-                          isNew: true,
-                          orderId: '#ORD-20240521-001',
-                          time: '2 menit lalu',
-                          customerName: 'Budi Speed',
-                          phone: '0812-3456-7890',
-                          address:
-                              'Jl. Lamongrejo No. 22\nKec. Lamongan, Kota Lamongan',
-                          serviceName: 'Servis Motor Matic',
-                          problem: 'Motor brebet, susah starter',
-                          distance: '3.2 km',
-                          buttonType: OrderButtonType.tracking,
-                        ),
-                        const SizedBox(height: 14),
-                        _buildOrderCard(
-                          isNew: true,
-                          orderId: '#ORD-20240521-002',
-                          time: '5 menit lalu',
-                          customerName: 'Rizal Patung',
-                          phone: '0813-9876-5432',
-                          address: 'Jl. Ahmad Yani No.45',
-                          serviceName: '',
-                          problem: '',
-                          distance: '',
-                          buttonType: OrderButtonType.acceptReject,
-                        ),
-                      ],
-                    ),
+                    child: isLoading
+                        ? const Center(
+                            child: CircularProgressIndicator(),
+                          )
+                        : Column(
+                            children: orders.map((order) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 14),
+                                child: _buildOrderCard(
+                                  isNew: true,
+                                  orderId: order['order_code'] ?? '',
+                                  dbOrderId: order['id'],
+                                  time: 'Baru',
+                                  customerName: order['customer_name'] ?? '',
+                                  phone: order['customer_phone'] ?? '',
+                                  address:
+                                      '${order['user_latitude']}, ${order['user_longitude']}',
+                                  serviceName: 'Servis Kendaraan',
+                                  problem: order['problem'] ?? '',
+                                  distance: '',
+                                  buttonType:
+                                      order['status'] == 'pending'
+                                          ? OrderButtonType.acceptReject
+                                          : OrderButtonType.tracking,
+                                ),
+                              );
+                            }).toList(),
+                          ),
                   ),
                 ),
               ],
@@ -108,11 +134,27 @@ class _MechanicHomePageState extends State<MechanicHomePage> {
             child: Row(
               children: [
                 Expanded(
-                  child: _buildCounterItem(title: 'Order Baru', value: '2'),
+                  child: 
+                   _buildCounterItem(
+                     title: 'Order Baru',
+                     value: orders
+                         .where((o) => o['status'] == 'pending')
+                         .length
+                         .toString(),
+                  ),
                 ),
                 Container(width: 1, height: 42, color: const Color(0xFFE5E7EB)),
                 Expanded(
-                  child: _buildCounterItem(title: 'Order Aktif', value: '1'),
+                  child:
+                  _buildCounterItem(
+                    title: 'Order Aktif',
+                    value: orders
+                        .where((o) =>
+                            o['status'] == 'on_the_way' ||
+                            o['status'] == 'service')
+                        .length
+                        .toString(),
+                  ),
                 ),
               ],
             ),
@@ -151,6 +193,7 @@ class _MechanicHomePageState extends State<MechanicHomePage> {
   Widget _buildOrderCard({
     required bool isNew,
     required String orderId,
+    required int dbOrderId,
     required String time,
     required String customerName,
     required String phone,
@@ -252,9 +295,9 @@ class _MechanicHomePageState extends State<MechanicHomePage> {
           ],
           const SizedBox(height: 16),
           if (buttonType == OrderButtonType.tracking)
-            _buildTrackingAction(distance)
+            _buildTrackingAction(distance, dbOrderId,)
           else
-            _buildAcceptRejectAction(),
+            _buildAcceptRejectAction(dbOrderId),
         ],
       ),
     );
@@ -306,7 +349,7 @@ class _MechanicHomePageState extends State<MechanicHomePage> {
     );
   }
 
-  Widget _buildTrackingAction(String distance) {
+  Widget _buildTrackingAction(String distance, int orderId,) {
     return Row(
       children: [
         Expanded(
@@ -379,7 +422,7 @@ class _MechanicHomePageState extends State<MechanicHomePage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const MechanicTrackingPage(),
+                    builder: (_) => MechanicTrackingPage(orderId: orderId,),
                   ),
                 );
               },
@@ -414,7 +457,7 @@ class _MechanicHomePageState extends State<MechanicHomePage> {
     );
   } 
 
-  Widget _buildAcceptRejectAction() {
+  Widget _buildAcceptRejectAction(int orderId) {
     return Row(
       children: [
         Expanded(
@@ -447,8 +490,46 @@ class _MechanicHomePageState extends State<MechanicHomePage> {
           child: SizedBox(
             height: 39,
             child: ElevatedButton(
-              onPressed: () {
-                // nanti aksi terima order
+              onPressed: () async {
+                try {
+                  print('TOMBOL TERIMA ORDER DIKLIK');
+
+                  final response = await ApiService.client.post(
+                    '/orders/$orderId/accept',
+                  );
+
+                  print('STATUS CODE: ${response.statusCode}');
+                  print('RESPONSE: ${response.data}');
+
+                  if (response.statusCode == 200) {
+                    if (!mounted) return;
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Order berhasil diterima'),
+                      ),
+                    );
+
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MechanicTrackingPage(
+                          orderId: orderId,
+                        ),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  print('ERROR ACCEPT ORDER: $e');
+
+                  if (!mounted) return;
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Gagal menerima order: $e'),
+                    ),
+                  );
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFF7043),
@@ -513,9 +594,30 @@ class _MechanicHomePageState extends State<MechanicHomePage> {
         }
 
         if (index == 1) {
+
+          final activeOrder = orders.firstWhere(
+            (o) =>
+                o['status'] == 'on_the_way' ||
+                o['status'] == 'service',
+            orElse: () => null,
+          );
+
+          if (activeOrder == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Belum ada order aktif'),
+              ),
+            );
+            return;
+          }
+
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const MechanicTrackingPage()),
+            MaterialPageRoute(
+              builder: (_) => MechanicTrackingPage(
+                orderId: activeOrder['id'],
+              ),
+            ),
           );
         }
 

@@ -1,21 +1,20 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-
 import '../models/order_tracking.dart';
+import 'api.dart';
 
 class OrderService {
-  static const String baseUrl = 'https://backend-qgis.onrender.com/api';
-
   static Future<OrderTracking> getTracking(int orderId) async {
-    final url = Uri.parse('$baseUrl/orders/$orderId/tracking');
-
-    final response = await http.get(url);
+    final response = await ApiService.client.get(
+      '/orders/$orderId/tracking',
+    );
 
     if (response.statusCode == 200) {
-      final result = jsonDecode(response.body);
-      return OrderTracking.fromJson(result['data']);
+      return OrderTracking.fromJson(
+        response.data['data'],
+      );
     } else {
-      throw Exception('Gagal mengambil data tracking order');
+      throw Exception(
+        'Gagal mengambil data tracking order',
+      );
     }
   }
 
@@ -27,30 +26,32 @@ class OrderService {
     required double userLat,
     required double userLng,
   }) async {
-    final url = Uri.parse('$baseUrl/orders');
+    try {
+      final response = await ApiService.client.post(
+        '/orders',
+        data: {
+          'user_id': userId,
+          'workshop_id': workshopId,
+          'mechanic_id': mechanicId,
+          'problem': problem,
+          'user_lat': userLat,
+          'user_lng': userLng,
+        },
+      );
 
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: jsonEncode({
-        'user_id': userId,
-        'workshop_id': workshopId,
-        'mechanic_id': mechanicId,
-        'problem': problem,
-        'user_lat': userLat,
-        'user_lng': userLng,
-      }),
-    );
+      if (response.statusCode == 200 ||
+          response.statusCode == 201) {
+        return int.parse(
+          response.data['data']['id'].toString(),
+        );
+      }
 
-    if (response.statusCode == 201 || response.statusCode == 200) {
-      final result = jsonDecode(response.body);
-      return int.parse(result['data']['id'].toString());
-    } else {
       throw Exception(
-        'Gagal membuat order: ${response.statusCode} ${response.body}',
+        'Gagal membuat order',
+      );
+    } catch (e) {
+      throw Exception(
+        'Gagal membuat order: $e',
       );
     }
   }

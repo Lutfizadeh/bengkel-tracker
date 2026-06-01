@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import '../../services/api.dart';
 import '../../constants/app_colors.dart';
 import '../auth/auth_gate.dart';
 import 'mechanic_menu_chat_page.dart';
@@ -37,7 +37,38 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
         _isLoading = false;
       });
     }
-  } // <-- Tanda kurung penutup ini sekarang sudah aman kembali!
+  }
+  
+  Future<void> _updateStatus(bool value) async {
+    try {
+      await ApiService.client.patch(
+        '/mechanics/1/status',
+        data: {
+          'status': value ? 'open' : 'close',
+        },
+      );
+
+      setState(() {
+        isOnline = value;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            value ? 'Status Online' : 'Status Offline',
+          ),
+        ),
+      );
+    } catch (e) {
+      print(e);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Gagal mengubah status'),
+        ),
+      );
+    }
+  }
 
   Future<void> _actionLogout() async {
     final konfirmasi = await showDialog<bool>(
@@ -494,7 +525,7 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
             activeTrackColor: const Color(0xFF22C55E),
             inactiveThumbColor: Colors.white,
             inactiveTrackColor: const Color(0xFFD1D5DB),
-            onChanged: (value) => setState(() => isOnline = value),
+            onChanged: _updateStatus,
           ),
         ],
       ),

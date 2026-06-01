@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -15,13 +16,55 @@ import 'chat_list_page.dart';
 import 'history_page.dart';
 import 'home_page.dart';
 
-class TrackingPage extends StatelessWidget {
+class TrackingPage extends StatefulWidget {
   const TrackingPage({
     super.key,
     this.orderId = 1,
   });
 
   final int orderId;
+
+  @override
+  State<TrackingPage> createState() =>
+      _TrackingPageState();
+}
+
+class _TrackingPageState
+    extends State<TrackingPage> {
+
+  late Future<OrderTracking> trackingFuture;
+
+  Timer? refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+
+    trackingFuture =
+        OrderService.getTracking(
+      widget.orderId,
+    );
+
+    /* refreshTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) {
+        if (!mounted) return;
+
+        setState(() {
+          trackingFuture =
+              OrderService.getTracking(
+            widget.orderId,
+          );
+        });
+      },
+    ); */
+  }
+
+  @override
+  void dispose() {
+    refreshTimer?.cancel();
+    super.dispose();
+  }
 
   void _goHome(BuildContext context) => Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const HomePage()),
@@ -38,7 +81,7 @@ class TrackingPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<OrderTracking>(
-      future: OrderService.getTracking(orderId),
+      future: trackingFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -65,6 +108,13 @@ class TrackingPage extends StatelessWidget {
         }
 
         final tracking = snapshot.data!;
+        print(
+          'MEKANIK: '
+          '${tracking.mechanicLatitude}, '
+          '${tracking.mechanicLongitude}',
+        );
+
+        print('STATUS TRACKING = ${tracking.status}');
 
         return Scaffold(
           backgroundColor: AppColors.background,
@@ -184,13 +234,20 @@ class _MapArea extends StatefulWidget {
 
 class _MapAreaState extends State<_MapArea> {
   List<LatLng> routePoints = [];
-  bool isRouteLoading = true;
+  bool isRouteLoading = false; // ubah ini
 
   @override
-  void initState() {
-    super.initState();
-    _loadRoute();
-  }
+    void didUpdateWidget(covariant _MapArea oldWidget) {
+      super.didUpdateWidget(oldWidget);
+
+      if (widget.tracking.mechanicLatitude !=
+              oldWidget.tracking.mechanicLatitude ||
+          widget.tracking.mechanicLongitude !=
+              oldWidget.tracking.mechanicLongitude) {
+
+        _loadRoute();
+      }
+    }
 
   Future<void> _loadRoute() async {
     final tracking = widget.tracking;
@@ -403,7 +460,7 @@ class _MapAreaState extends State<_MapArea> {
               ),
             ),
           ),
-          if (isRouteLoading)
+          /* if (isRouteLoading)
             Positioned(
               right: 18,
               top: 16,
@@ -421,7 +478,7 @@ class _MapAreaState extends State<_MapArea> {
                   ),
                 ),
               ),
-            ),
+            ), */
         ],
       ),
     );
@@ -440,11 +497,11 @@ int get _activeStep {
     if (status == 'paid') return 2;
     if (status == 'on_the_way') return 3;
     if (status == 'service') return 4;
-    if (status == 'done') return 5;
+    if (status == 'completed') return 5;
 
     // Karena user masuk halaman tracking setelah bayar biaya panggilan,
     // default-nya dianggap sudah lunas.
-    return 2;
+    return 1;
   }
 
   @override
