@@ -73,6 +73,12 @@ class _RegisterStep1PageState extends State<RegisterStep1Page> {
       setState(() => _isLoading = false);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
+        await LocalDataService.saveProfile(
+          name: nameCtrl.text.trim(),
+          email: emailCtrl.text.trim(),
+          phone: '+62${phoneCtrl.text.replaceAll(' ', '')}',
+          photoPath: '',
+        );
         _showSuccessDialog(); // Munculkan dialog sukses jika DB berhasil menyimpan
       }
     } on DioException catch (e) {

@@ -15,6 +15,7 @@ import 'vehicle_select_page.dart';
 import 'history_page.dart';
 import 'chat_list_page.dart';
 import 'payment_page.dart';
+import 'profil_page.dart';
 
 class ServicePage extends StatefulWidget {
   const ServicePage({super.key, this.initialServiceIndex = 0});
@@ -452,6 +453,9 @@ class _ServicePageState extends State<ServicePage> {
               ),
               onChatTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const ChatListPage()),
+              ),
+              onProfileTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ProfilePage()),
               ),
             ),
           ],

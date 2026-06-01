@@ -355,8 +355,6 @@ class _ProfilePageState extends State<ProfilePage> {
       children: [
         Expanded(child: _Stat(n: '3', l: 'Order')),
         VerticalDivider(color: AppColors.warmBorder),
-        Expanded(child: _Stat(n: '2', l: 'Bengkel Favorit')),
-        VerticalDivider(color: AppColors.warmBorder),
         Expanded(child: _Stat(n: 'Rp. 250rb', l: 'Total Servis')),
       ],
     ),

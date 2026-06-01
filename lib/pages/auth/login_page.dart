@@ -33,10 +33,17 @@ class _LoginPageState extends State<LoginPage> {
     try {
       // 2. PERBAIKAN: Cukup panggil ApiService.client secara langsung.
       // Url dasar (baseUrl) dan header Content-Type sudah terbungkus otomatis di dalamnya.
-      final response = await ApiService.client.post(
-        '/login',
-        data: {'email': _emailCtrl.text.trim(), 'password': _passCtrl.text},
-      );
+      final loginInput = _emailCtrl.text.trim();
+      final isPhoneLogin = _isPhoneInput(loginInput);
+      final payload = isPhoneLogin
+          ? {
+            'email': loginInput,
+            'phone': _normalizePhone(loginInput),
+            'password': _passCtrl.text,
+          }
+          : {'email': loginInput, 'password': _passCtrl.text};
+
+      final response = await ApiService.client.post('/login', data: payload);
 
       setState(() => _isLoading = false);
 
@@ -61,10 +68,19 @@ class _LoginPageState extends State<LoginPage> {
         await prefs.setString('role', role);
 
         // Sinkronisasikan juga ke format JSON Profile milik LocalDataService
+        final existingProfile = await LocalDataService.getProfile();
+        final apiPhone = data['user']['phone']?.toString().trim() ?? '';
+        final savedPhone = existingProfile['phone']?.trim() ?? '';
+        final loginPhone = _normalizePhone(_emailCtrl.text);
+
+        final resolvedPhone = apiPhone.isNotEmpty
+            ? apiPhone
+            : (savedPhone.isNotEmpty ? savedPhone : loginPhone);
+
         await LocalDataService.saveProfile(
           name: name,
           email: email,
-          phone: data['user']['phone']?.toString() ?? '',
+          phone: resolvedPhone,
           photoPath: data['user']['photo']?.toString() ?? '',
         );
 
@@ -353,4 +369,18 @@ class _HeaderCircle extends StatelessWidget {
     height: size,
     decoration: BoxDecoration(shape: BoxShape.circle, color: color),
   );
+}
+
+String _normalizePhone(String input) {
+  final digits = input.replaceAll(RegExp(r'\D'), '');
+  if (digits.isEmpty) return '';
+  if (digits.startsWith('62')) return '+$digits';
+  if (digits.startsWith('0')) return '+62${digits.substring(1)}';
+  return '+62$digits';
+}
+
+bool _isPhoneInput(String input) {
+  if (input.contains('@')) return false;
+  final digits = input.replaceAll(RegExp(r'\D'), '');
+  return digits.length >= 8;
 }
