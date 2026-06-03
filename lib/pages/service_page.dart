@@ -16,6 +16,8 @@ import 'history_page.dart';
 import 'chat_list_page.dart';
 import 'payment_page.dart';
 import 'profil_page.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../services/payment_service.dart';
 
 class ServicePage extends StatefulWidget {
   const ServicePage({super.key, this.initialServiceIndex = 0});
@@ -137,10 +139,8 @@ class _ServicePageState extends State<ServicePage> {
         setState(() {});
       }
 
-      final List<Mechanic> mechanics = await MechanicService.getNearestMechanics(
-        lat: userLat,
-        lng: userLng,
-      );
+      final List<Mechanic> mechanics =
+          await MechanicService.getNearestMechanics(lat: userLat, lng: userLng);
 
       if (!mounted) return;
 
@@ -169,6 +169,7 @@ class _ServicePageState extends State<ServicePage> {
       final String problemText =
           isOtherService ? 'Lainnya - $otherProblem' : selectedService.title;
 
+      // 1. Buat data order ke DB PostgreSQL backend Render
       final orderId = await OrderService.createOrder(
         userId: 1,
         workshopId: mechanic.workshopId,
@@ -180,17 +181,16 @@ class _ServicePageState extends State<ServicePage> {
 
       if (!mounted) return;
 
+      // 2. Oper orderId ke PaymentPage internal aplikasi
       Navigator.of(
         context,
       ).push(MaterialPageRoute(builder: (_) => PaymentPage(orderId: orderId)));
-      } catch (e) {
+    } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Gagal mencari mekanik: $e'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gagal mencari mekanik: $e')));
     } finally {
       if (mounted) {
         setState(() {
@@ -203,9 +203,10 @@ class _ServicePageState extends State<ServicePage> {
 
   @override
   Widget build(BuildContext context) {
-    final locationText = isLocationLoading
-        ? 'Mengambil lokasi GPS...'
-        : '${userLat.toStringAsFixed(6)}, ${userLng.toStringAsFixed(6)}';
+    final locationText =
+        isLocationLoading
+            ? 'Mengambil lokasi GPS...'
+            : '${userLat.toStringAsFixed(6)}, ${userLng.toStringAsFixed(6)}';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -416,7 +417,9 @@ class _ServicePageState extends State<ServicePage> {
                             height: 50,
                             child: ElevatedButton(
                               onPressed:
-                                  isLoading ? null : _findMechanicAndCreateOrder,
+                                  isLoading
+                                      ? null
+                                      : _findMechanicAndCreateOrder,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.navy,
                                 foregroundColor: AppColors.white,
@@ -448,15 +451,18 @@ class _ServicePageState extends State<ServicePage> {
               activeIndex: 2,
               onCenterTap: isLoading ? () {} : _findMechanicAndCreateOrder,
               onHomeTap: () => Navigator.of(context).maybePop(),
-              onHistoryTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const HistoryPage()),
-              ),
-              onChatTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ChatListPage()),
-              ),
-              onProfileTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ProfilePage()),
-              ),
+              onHistoryTap:
+                  () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const HistoryPage()),
+                  ),
+              onChatTap:
+                  () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ChatListPage()),
+                  ),
+              onProfileTap:
+                  () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ProfilePage()),
+                  ),
             ),
           ],
         ),

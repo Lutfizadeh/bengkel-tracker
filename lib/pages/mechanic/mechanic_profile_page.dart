@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 import '../../services/api.dart';
 import '../../constants/app_colors.dart';
 import '../auth/auth_gate.dart';
@@ -16,6 +17,14 @@ class MechanicProfilePage extends StatefulWidget {
 }
 
 class _MechanicProfilePageState extends State<MechanicProfilePage> {
+  final NumberFormat rupiah = NumberFormat.currency(
+    locale: 'id_ID',
+    symbol: 'Rp ',
+    decimalDigits: 0,
+  );
+
+  int completedOrder = 0;
+  double income = 0;
   bool isOnline = true;
 
   String _mechanicName = 'Mekanik';
@@ -26,6 +35,24 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
   void initState() {
     super.initState();
     _loadMechanicData();
+    _loadStatistic();
+  }
+
+  Future<void> _loadStatistic() async {
+    try {
+      final response =
+          await ApiService.client.get('/mechanic/statistic');
+
+      setState(() {
+        completedOrder =
+            response.data['completed_order'] ?? 0;
+
+        income =
+            (response.data['income'] ?? 0).toDouble();
+      });
+    } catch (e) {
+      print(e);
+    }
   }
 
   Future<void> _loadMechanicData() async {
@@ -382,7 +409,7 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
         children: [
           Expanded(
             child: _statItem(
-              value: 'Rp 3.3jt',
+              value: rupiah.format(income),
               label: 'Bulan ini',
               subLabel: '+12%',
               valueColor: const Color(0xFFFF7043),
@@ -392,8 +419,8 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
           _divider(),
           Expanded(
             child: _statItem(
-              value: '22',
-              label: 'Total Order',
+              value: completedOrder.toString(),
+              label: 'Order Selesai',
               subLabel: 'Selesai semua',
               valueColor: const Color(0xFF111827),
               subColor: const Color(0xFF22C55E),
@@ -410,15 +437,7 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
             ),
           ),
           _divider(),
-          Expanded(
-            child: _statItem(
-              value: '93%',
-              label: 'Respon',
-              subLabel: 'Sangat baik',
-              valueColor: const Color(0xFF111827),
-              subColor: const Color(0xFF22C55E),
-            ),
-          ),
+          
         ],
       ),
     );

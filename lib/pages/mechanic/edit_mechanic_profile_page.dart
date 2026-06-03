@@ -60,12 +60,18 @@ class _EditMechanicProfilePageState extends State<EditMechanicProfilePage> {
     try {
       // 3. IMPLEMENTASI BEST PRACTICE:
       // Menggunakan ApiService terpusat jauh lebih bersih daripada menginisialisasi BaseOptions manual di sini
+      String phone = _phoneController.text.trim();
+
+      if (phone.startsWith('0')) {
+        phone = phone.substring(1);
+      }
+
       final response = await ApiService.client.put(
         '/profile/update',
         data: {
           'name': _nameController.text.trim(),
           'email': _emailController.text.trim(),
-          'phone': '+62 ${_phoneController.text.trim()}',
+          'phone': '+62$phone',
         },
       );
 

@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-
 import 'tracking_page.dart';
 
 class PaymentSuccessPage extends StatelessWidget {
   final int orderId;
-  final int totalPayment;
+  final int totalPayment; // Mengunci data bulat murni kiriman dari PaymentPage
   final String paymentMethod;
 
   const PaymentSuccessPage({
@@ -14,10 +13,12 @@ class PaymentSuccessPage extends StatelessWidget {
     required this.paymentMethod,
   });
 
+  // Fungsi utilitas pemformat mata uang Rupiah
   String formatRupiah(int value) {
     return 'Rp ${value.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (match) => '${match[1]}.')}';
   }
 
+  // Konversi value string method menjadi nama estetik di UI struk
   String get paymentName {
     if (paymentMethod == 'qris') return 'QRIS';
     if (paymentMethod == 'gopay') return 'GoPay';
@@ -46,11 +47,8 @@ class PaymentSuccessPage extends StatelessWidget {
           child: Column(
             children: [
               const Spacer(),
-
               _buildSuccessIcon(),
-
               const SizedBox(height: 28),
-
               const Text(
                 'Pembayaran\nBerhasil!',
                 textAlign: TextAlign.center,
@@ -61,9 +59,7 @@ class PaymentSuccessPage extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                 ),
               ),
-
               const SizedBox(height: 8),
-
               const Text(
                 'Biaya panggilan mekanik sudah berhasil dibayar.',
                 textAlign: TextAlign.center,
@@ -74,17 +70,11 @@ class PaymentSuccessPage extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                 ),
               ),
-
               const SizedBox(height: 28),
-
               _buildReceiptCard(),
-
               const SizedBox(height: 18),
-
               _buildInfoBox(),
-
               const Spacer(),
-
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -148,6 +138,26 @@ class PaymentSuccessPage extends StatelessWidget {
   }
 
   Widget _buildReceiptCard() {
+    final now = DateTime.now();
+    final List<String> months = [
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
+    ];
+    final String tanggalDinamis =
+        '${now.day} ${months[now.month - 1]} ${now.year}';
+    final String waktuDinamis =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} WIB';
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
@@ -166,23 +176,21 @@ class PaymentSuccessPage extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-
           const SizedBox(height: 8),
-
           Text(
-            formatRupiah(totalPayment),
+            formatRupiah(
+              totalPayment,
+            ), // Menampilkan totalPayment kiriman dengan aman tanpa crash
             style: const TextStyle(
               color: Colors.white,
               fontSize: 30,
               fontWeight: FontWeight.w900,
             ),
           ),
-
           const SizedBox(height: 18),
-
           _receiptRow('Metode', paymentName),
-          _receiptRow('Tanggal', '21 Mei 2024'),
-          _receiptRow('Waktu', '22:45 WIB'),
+          _receiptRow('Tanggal', tanggalDinamis),
+          _receiptRow('Waktu', waktuDinamis),
           _receiptRow('Status', 'Lunas'),
         ],
       ),

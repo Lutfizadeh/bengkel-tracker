@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/api.dart';
-
+import 'package:dio/dio.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
@@ -33,6 +33,8 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
   Map<String, dynamic>? _orderData;
   LatLng? _customerPosition;
   LatLng? _mechanicPosition;
+  List<LatLng> _routePoints = [];
+  DateTime? _lastRouteUpdate;
 
   bool _isLoading = true;
   String _distanceText = 'Menghitung...';
@@ -67,6 +69,7 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
 
       // 2. Mulai Lacak GPS Mekanik
       await _startLocationTracking();
+      await _loadRoute();
     } catch (e) {
       debugPrint('Error loading data: $e');
     } finally {
@@ -119,12 +122,21 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
 
     setState(() {
       _mechanicPosition = LatLng(position.latitude, position.longitude);
+      if (_lastRouteUpdate == null ||
+          DateTime.now()
+                  .difference(_lastRouteUpdate!)
+                  .inSeconds >
+              5) {
+
+        _lastRouteUpdate = DateTime.now();
+        _loadRoute();
+      }
 
       // Otomatis geser peta mengikuti mekanik
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _mapController.move(
           _mechanicPosition!,
-          16.0,
+          _mapController.camera.zoom,
         );
       });
 
@@ -180,6 +192,40 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
     }
   }
 
+  Future<void> _loadRoute() async {
+    if (_mechanicPosition == null ||
+        _customerPosition == null) {
+      return;
+    }
+
+    try {
+      final response = await Dio().get(
+        'https://router.project-osrm.org/route/v1/driving/'
+        '${_mechanicPosition!.longitude},${_mechanicPosition!.latitude};'
+        '${_customerPosition!.longitude},${_customerPosition!.latitude}',
+        queryParameters: {
+          'overview': 'full',
+          'geometries': 'geojson',
+        },
+      );
+
+      final coordinates =
+          response.data['routes'][0]['geometry']['coordinates'];
+
+      setState(() {
+        _routePoints =
+            coordinates.map<LatLng>((coord) {
+              return LatLng(
+                coord[1].toDouble(),
+                coord[0].toDouble(),
+              );
+            }).toList();
+      });
+    } catch (e) {
+      debugPrint('OSRM ERROR: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -213,10 +259,7 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
                 PolylineLayer(
                   polylines: [
                     Polyline(
-                      points: [
-                        _mechanicPosition!,
-                        _customerPosition!,
-                      ],
+                      points: _routePoints,
                       strokeWidth: 5,
                       color: Colors.blue,
                     ),
@@ -550,10 +593,10 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Align(
+          Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              'Dalam perjalanan',
+              'Dalam Perjalanan',
               style: TextStyle(
                 color: Color(0xFF111827),
                 fontSize: 20,
@@ -694,22 +737,31 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
     );
   }
 
-  static Widget _buildMechanicMarker() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.blue,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.blue.withOpacity(0.35),
-            blurRadius: 10,
-            spreadRadius: 4,
-          ),
-        ],
+static Widget _buildMechanicMarker() {
+  return Container(
+    width: 50,
+    height: 50,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      border: Border.all(
+        color: Colors.white,
+        width: 3,
       ),
-    );
-  }
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black26,
+          blurRadius: 6,
+        ),
+      ],
+    ),
+    child: ClipOval(
+      child: Image.asset(
+        'assets/images/bengkel.jpg',
+        fit: BoxFit.cover,
+      ),
+    ),
+  );
+}
 
   static Widget _buildCustomerMarker() {
     return Container(

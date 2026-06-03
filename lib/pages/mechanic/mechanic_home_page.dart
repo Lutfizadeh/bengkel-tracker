@@ -25,23 +25,35 @@ class _MechanicHomePageState extends State<MechanicHomePage> {
     loadOrders();
   }
 
-  Future<void> loadOrders() async {
-    try {
-      final response = await ApiService.client.get(
-        '/mechanic/orders',
-      );
+Future<void> loadOrders() async {
+  try {
+    final response = await ApiService.client.get('/mechanic/orders');
 
-      setState(() {
-        orders = response.data['data'];
-        isLoading = false;
-      });
-    } catch (e) {
-      print(e);
+    print('================================');
+    print('STATUS CODE = ${response.statusCode}');
+    print('RESPONSE DATA = ${response.data}');
+    print('================================');
 
-      setState(() {
-        isLoading = false;
-      });
-    }
+    setState(() {
+      orders = List<dynamic>.from(response.data['data'] ?? []);
+      isLoading = false;
+    });
+
+    print('ORDER DI FLUTTER = ${orders.length}');
+  } on DioException catch (e) {
+    print('ERROR STATUS = ${e.response?.statusCode}');
+    print('ERROR DATA = ${e.response?.data}');
+
+    setState(() {
+      isLoading = false;
+    });
+  } catch (e) {
+    print('ERROR = $e');
+
+    setState(() {
+      isLoading = false;
+    });
+  }
 }
 
   @override

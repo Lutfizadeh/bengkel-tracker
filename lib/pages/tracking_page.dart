@@ -32,7 +32,7 @@ class TrackingPage extends StatefulWidget {
 class _TrackingPageState
     extends State<TrackingPage> {
 
-  late Future<OrderTracking> trackingFuture;
+  OrderTracking? trackingData;
 
   Timer? refreshTimer;
 
@@ -40,10 +40,15 @@ class _TrackingPageState
   void initState() {
     super.initState();
 
-    trackingFuture =
-        OrderService.getTracking(
-      widget.orderId,
+    _loadTracking();
+
+    refreshTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) {
+        _loadTracking();
+      },
     );
+  }
 
     /* refreshTimer = Timer.periodic(
       const Duration(seconds: 5),
@@ -58,13 +63,30 @@ class _TrackingPageState
         });
       },
     ); */
-  }
+  
 
   @override
   void dispose() {
     refreshTimer?.cancel();
     super.dispose();
   }
+
+Future<void> _loadTracking() async {
+  try {
+    final data =
+        await OrderService.getTracking(
+      widget.orderId,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      trackingData = data;
+    });
+  } catch (e) {
+    print(e);
+  }
+}
 
   void _goHome(BuildContext context) => Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const HomePage()),
@@ -78,36 +100,19 @@ class _TrackingPageState
         )}';
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<OrderTracking>(
-      future: trackingFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            backgroundColor: AppColors.background,
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
-          );
-        }
+@override
+Widget build(BuildContext context) {
 
-        if (snapshot.hasError) {
-          return Scaffold(
-            backgroundColor: AppColors.background,
-            body: Center(
-              child: Padding(
-                padding: EdgeInsets.all(20),
-                child: Text(
-                  'Gagal mengambil data tracking.',
-                  style: TextStyle(color: Colors.red),
-                ),
-              ),
-            ),
-          );
-        }
+  if (trackingData == null) {
+    return const Scaffold(
+      backgroundColor: AppColors.background,
+      body: Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+  }
 
-        final tracking = snapshot.data!;
+  final tracking = trackingData!;
         print(
           'MEKANIK: '
           '${tracking.mechanicLatitude}, '
@@ -216,8 +221,8 @@ class _TrackingPageState
             ),
           ),
         );
-      },
-    );
+      
+    
   }
 }
 
@@ -234,7 +239,18 @@ class _MapArea extends StatefulWidget {
 
 class _MapAreaState extends State<_MapArea> {
   List<LatLng> routePoints = [];
-  bool isRouteLoading = false; // ubah ini
+  bool isRouteLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    isRouteLoading = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadRoute();
+    });
+  }
 
   @override
     void didUpdateWidget(covariant _MapArea oldWidget) {
@@ -244,6 +260,10 @@ class _MapAreaState extends State<_MapArea> {
               oldWidget.tracking.mechanicLatitude ||
           widget.tracking.mechanicLongitude !=
               oldWidget.tracking.mechanicLongitude) {
+
+          setState(() {
+              isRouteLoading = true;
+            });
 
         _loadRoute();
       }
@@ -272,13 +292,16 @@ class _MapAreaState extends State<_MapArea> {
 
       final response = await http.get(url);
 
+      print('OSRM STATUS: ${response.statusCode}');
+      print(response.body);
+
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body);
         final routes = result['routes'] as List;
 
         if (routes.isNotEmpty) {
           final coordinates = routes.first['geometry']['coordinates'] as List;
-
+          print('JUMLAH TITIK ROUTE: ${coordinates.length}');
           final points = coordinates.map<LatLng>((coord) {
             return LatLng(
               double.parse(coord[1].toString()),

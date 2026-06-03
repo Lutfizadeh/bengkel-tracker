@@ -1,6 +1,10 @@
+import 'dart:async'; // 1. WAJIB TAMBAH: Untuk mengaktifkan objek Timer Polling
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../constants/app_colors.dart';
+import '../services/local_data_service.dart';
+import '../services/api.dart'; // Impor ApiService.client
 import 'payment_success_page.dart';
 
 class PaymentPage extends StatefulWidget {
@@ -14,30 +18,139 @@ class PaymentPage extends StatefulWidget {
 
 class _PaymentPageState extends State<PaymentPage> {
   String selectedPayment = 'qris';
-
+  bool _isProcessing = false;
   final int servicePrice = 25000;
-  final int platformFee = 500;
+  final int adminPrice = 0;
+  int get totalPayment => servicePrice + adminPrice;
 
-  int get totalPayment => servicePrice + platformFee;
+  // 2. TAMBAHKAN VARIABEL KONTROL TIMBER DI SINI
+  Timer? _pollingTimer;
+  String? _currentXenditId;
 
   String formatRupiah(int value) {
     return 'Rp ${value.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (match) => '${match[1]}.')}';
   }
 
-  void _payNow() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder:
-            (_) => PaymentSuccessPage(
-              orderId: widget.orderId,
-              totalPayment: totalPayment,
-              paymentMethod: selectedPayment,
-            ),
-      ),
-    );
+  @override
+  void dispose() {
+    // 3. WAJIB: Batalkan timer saat user keluar dari halaman agar memori HP/Laptop tidak bocor
+    _pollingTimer?.cancel();
+    super.dispose();
   }
-  
+
+  Future<void> _payNow() async {
+    if (_isProcessing) return;
+    setState(() => _isProcessing = true);
+
+    try {
+      final userProfile = await LocalDataService.getProfile();
+      final String userEmail =
+          userProfile['email'] ?? 'pelanggan@bengkeltrack.com';
+
+      // AMBIL URL & PORT REALTIME YANG SEDANG BERJALAN DI BROWSER KAMU SAAT INI
+      final String currentBrowserUrl = Uri.base.toString();
+
+      // 1. Hit API pembuatan invoice ke Render
+      final response = await ApiService.client.post(
+        'https://bengkel-tracker.onrender.com/api/payments/create-invoice',
+        data: {
+          "payer_email": userEmail,
+          "order_id": widget.orderId,
+          "method": selectedPayment,
+          "amount": totalPayment,
+          "redirect_url": currentBrowserUrl,
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final resData = response.data;
+        final String checkoutUrl =
+            resData['data']['checkout_url']?.toString() ?? '';
+
+        // Simpan xendit_id dari response pembuat invoice untuk modal pencarian webhook nanti
+        _currentXenditId = resData['data']['xendit_id']?.toString();
+
+        if (checkoutUrl.isEmpty || _currentXenditId == null) {
+          throw Exception('Data Invoice Xendit tidak lengkap.');
+        }
+
+        // 2. Buka Tab Baru Pembayaran Xendit
+        final Uri url = Uri.parse(checkoutUrl);
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+
+        // 3. NYALAKAN MESIN POLLING: Cek status ke webhook server setiap 3 detik sekali
+        _startPaymentPolling();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isProcessing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal memproses transaksi: $e'),
+          backgroundColor: AppColors.red,
+        ),
+      );
+    }
+  }
+
+  // 4. LOGIKA UTAMA POLLING STATUS WEBHOOK
+  void _startPaymentPolling() {
+    // Batalkan timer lama jika ada yang masih berjalan secara tidak sengaja
+    _pollingTimer?.cancel();
+
+    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      if (_currentXenditId == null) return;
+
+      try {
+        // Tembak endpoint webhook yang sudah Anda siapkan (Bearer token otomatis disisipkan oleh api.dart)
+        final response = await ApiService.client.post(
+          'https://bengkel-tracker.onrender.com/api/payments/webhook',
+          data: {"xendit_id": _currentXenditId},
+        );
+
+        if (response.statusCode == 200) {
+          final status =
+              response.data['data']['status']?.toString().toUpperCase();
+
+          // Jika status sudah LUNAS (PAID)
+          if (status == 'PAID') {
+            _pollingTimer?.cancel(); // Hentikan timer berkala langsung
+
+            if (!mounted) return;
+
+            // Ambil nilai integer murni untuk mengamankan kompilasi JavaScript Web
+            final int fixedTotalValue = totalPayment.toInt();
+
+            // REDIRECT: Pindah ke PaymentSuccessPage dengan tipe data yang aman
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder:
+                    (_) => PaymentSuccessPage(
+                      orderId: widget.orderId,
+                      totalPayment:
+                          fixedTotalValue, // 🌟 PERBAIKAN: Gunakan nilai variabel yang sudah di .toInt()
+                      paymentMethod: selectedPayment,
+                    ),
+              ),
+              (route) => false,
+            );
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Pembayaran Berhasil Dikonfirmasi!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        // Biarkan silent error jika RTO/Koneksi goyang saat mempolling, agar tidak mengganggu UI user
+        debugPrint('Sedang memantau status pembayaran...');
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -71,19 +184,19 @@ class _PaymentPageState extends State<PaymentPage> {
                       value: 'gopay',
                       icon: Icons.account_balance_wallet,
                       title: 'GOPAY',
-                      subtitle: 'Saldo Rp 25.000',
+                      subtitle: 'Metode Instan e-Wallet',
                     ),
                     _buildPaymentOption(
                       value: 'ovo',
                       icon: Icons.account_balance_wallet_outlined,
                       title: 'OVO',
-                      subtitle: 'Saldo Rp 75.000',
+                      subtitle: 'Metode Instan e-Wallet',
                     ),
                     _buildPaymentOption(
                       value: 'dana',
                       icon: Icons.wallet,
                       title: 'DANA',
-                      subtitle: 'Saldo Rp 40.000',
+                      subtitle: 'Metode Instan e-Wallet',
                     ),
                     const SizedBox(height: 14),
                     _sectionTitle('VIRTUAL ACCOUNT'),
@@ -189,7 +302,7 @@ class _PaymentPageState extends State<PaymentPage> {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                SizedBox(height: 3),
+                const SizedBox(height: 3),
                 Text(
                   'Mogok / Mesin',
                   style: TextStyle(
@@ -236,6 +349,7 @@ class _PaymentPageState extends State<PaymentPage> {
 
     return GestureDetector(
       onTap: () {
+        if (_isProcessing) return;
         setState(() {
           selectedPayment = value;
         });
@@ -345,19 +459,23 @@ class _PaymentPageState extends State<PaymentPage> {
               width: 160,
               height: 48,
               child: ElevatedButton(
-                onPressed: _payNow,
+                onPressed:
+                    _isProcessing ? null : _payNow, // Disable jika loading
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFF7043),
+                  disabledBackgroundColor: AppColors.gray,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                child: const Text(
-                  'Bayar dengan QRIS',
+                child: Text(
+                  _isProcessing
+                      ? 'Memproses...'
+                      : 'Bayar via ${selectedPayment.toUpperCase()}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
