@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/api.dart';
@@ -39,6 +40,8 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
   bool _isLoading = true;
   String _distanceText = 'Menghitung...';
   String _etaText = '...';
+
+  double _heading = 0;
 
   @override
   void initState() {
@@ -122,6 +125,7 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
 
     setState(() {
       _mechanicPosition = LatLng(position.latitude, position.longitude);
+      _heading = position.heading;
       if (_lastRouteUpdate == null ||
           DateTime.now()
                   .difference(_lastRouteUpdate!)
@@ -737,27 +741,31 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
     );
   }
 
-static Widget _buildMechanicMarker() {
-  return Container(
-    width: 50,
-    height: 50,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      border: Border.all(
-        color: Colors.white,
-        width: 3,
-      ),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black26,
-          blurRadius: 6,
+Widget _buildMechanicMarker() {
+  return Transform.rotate(
+    angle: _heading * math.pi / 180,
+    child: Container(
+      width: 50,
+      height: 50,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Colors.white,
+          width: 3,
         ),
-      ],
-    ),
-    child: ClipOval(
-      child: Image.asset(
-        'assets/images/bengkel.jpg',
-        fit: BoxFit.cover,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blue.withOpacity(0.5),
+            blurRadius: 15,
+            spreadRadius: 5,
+          ),
+        ],
+      ),
+      child: ClipOval(
+        child: Image.asset(
+          'assets/images/bengkel.jpg',
+          fit: BoxFit.cover,
+        ),
       ),
     ),
   );
