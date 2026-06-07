@@ -28,7 +28,7 @@ class MechanicTrackingPage extends StatefulWidget {
 class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
   // Controller untuk menggerakkan peta
   final MapController _mapController = MapController();
-
+  
   // Stream untuk memantau pergerakan GPS
   StreamSubscription<Position>? _positionStream;
 
@@ -63,7 +63,8 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
       final profile = await LocalDataService.getProfile();
 
       if (profile.containsKey('id')) {
-        _currentUserId = int.tryParse(profile['id'].toString()) ?? 1;
+        _currentUserId =
+            int.tryParse(profile['id'].toString()) ?? 1;
       }
       // 1. Ambil data order (Posisi Pelanggan) dari API
       final response = await ApiService.client.get(
@@ -122,7 +123,11 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
   }
 
   void _updateTrackingInfo(Position position) {
-    _sendLocationToServer(position.latitude, position.longitude);
+
+    _sendLocationToServer(
+      position.latitude,
+      position.longitude,
+    );
 
     if (!mounted) return;
 
@@ -130,14 +135,21 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
       _mechanicPosition = LatLng(position.latitude, position.longitude);
       _heading = position.heading;
       if (_lastRouteUpdate == null ||
-          DateTime.now().difference(_lastRouteUpdate!).inSeconds > 5) {
+          DateTime.now()
+                  .difference(_lastRouteUpdate!)
+                  .inSeconds >
+              5) {
+
         _lastRouteUpdate = DateTime.now();
         _loadRoute();
       }
 
       // Otomatis geser peta mengikuti mekanik
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _mapController.move(_mechanicPosition!, _mapController.camera.zoom);
+        _mapController.move(
+          _mechanicPosition!,
+          _mapController.camera.zoom,
+        );
       });
 
       // Hitung Jarak
@@ -170,22 +182,31 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
     });
   }
 
-  Future<void> _sendLocationToServer(double lat, double lng) async {
+  Future<void> _sendLocationToServer(
+    double lat,
+    double lng,
+  ) async {
     try {
+
       final response = await ApiService.client.patch(
         '/mechanics/${_orderData?['mechanic_id']}/location',
-        data: {'lat': lat, 'lng': lng},
+        data: {
+          'lat': lat,
+          'lng': lng,
+        },
       );
 
       print(response.statusCode);
       print(response.data);
+
     } catch (e) {
       print(e);
     }
   }
 
   Future<void> _loadRoute() async {
-    if (_mechanicPosition == null || _customerPosition == null) {
+    if (_mechanicPosition == null ||
+        _customerPosition == null) {
       return;
     }
 
@@ -194,15 +215,22 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
         'https://router.project-osrm.org/route/v1/driving/'
         '${_mechanicPosition!.longitude},${_mechanicPosition!.latitude};'
         '${_customerPosition!.longitude},${_customerPosition!.latitude}',
-        queryParameters: {'overview': 'full', 'geometries': 'geojson'},
+        queryParameters: {
+          'overview': 'full',
+          'geometries': 'geojson',
+        },
       );
 
-      final coordinates = response.data['routes'][0]['geometry']['coordinates'];
+      final coordinates =
+          response.data['routes'][0]['geometry']['coordinates'];
 
       setState(() {
         _routePoints =
             coordinates.map<LatLng>((coord) {
-              return LatLng(coord[1].toDouble(), coord[0].toDouble());
+              return LatLng(
+                coord[1].toDouble(),
+                coord[0].toDouble(),
+              );
             }).toList();
       });
     } catch (e) {
@@ -213,12 +241,14 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
     }
 
-    if (_orderData == null ||
-        _customerPosition == null ||
-        _mechanicPosition == null) {
+    if (_orderData == null || _customerPosition == null || _mechanicPosition == null) {
       return _buildEmptyTrackingPage(context);
     }
 
@@ -266,7 +296,12 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
               ],
             ),
           ),
-          Positioned(left: 0, right: 0, top: 0, child: _buildHeader(context)),
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            child: _buildHeader(context),
+          ),
           Positioned(
             left: 16,
             right: 16,
@@ -554,7 +589,10 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
     );
   }
 
-  Widget _buildBottomSheet(BuildContext context, Map<String, dynamic> data) {
+  Widget _buildBottomSheet(
+    BuildContext context,
+    Map<String, dynamic> data,
+  ) {
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 26),
       decoration: const BoxDecoration(
@@ -603,14 +641,18 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
 
                   if (response.statusCode == 200) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Mekanik tiba di lokasi')),
+                      const SnackBar(
+                        content: Text('Mekanik tiba di lokasi'),
+                      ),
                     );
                   }
                 } catch (e) {
                   debugPrint('ERROR ARRIVE: $e');
 
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Gagal update status: $e')),
+                    SnackBar(
+                      content: Text('Gagal update status: $e'),
+                    ),
                   );
                 }
               },
@@ -644,7 +686,9 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
 
                   if (response.statusCode == 200) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Servis selesai')),
+                      const SnackBar(
+                        content: Text('Servis selesai'),
+                      ),
                     );
                   }
                 } catch (e) {
@@ -677,24 +721,28 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
                 try {
                   final response = await ApiService.client.post(
                     '/chat-rooms',
-                    data: {'order_id': widget.orderId},
+                    data: {
+                      'order_id': widget.orderId,
+                    },
                   );
 
                   if (response.statusCode == 200 ||
                       response.statusCode == 201) {
-                    final int roomChatId = response.data['data']['id'];
+
+                    final int roomChatId =
+                        response.data['data']['id'];
 
                     if (!context.mounted) return;
 
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder:
-                            (_) => ChatDetailPage(
-                              chatRoomId: roomChatId,
-                              currentUserId: _currentUserId,
-                              receiverName: data['user_name'] ?? 'Pelanggan',
-                            ),
+                        builder: (_) => ChatDetailPage(
+                          chatRoomId: roomChatId,
+                          currentUserId: _currentUserId,
+                          receiverName:
+                              data['user_name'] ?? 'Pelanggan',
+                        ),
                       ),
                     );
                   }
@@ -725,29 +773,35 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
     );
   }
 
-  Widget _buildMechanicMarker() {
-    return Transform.rotate(
-      angle: _heading * math.pi / 180,
-      child: Container(
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 3),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.blue.withOpacity(0.5),
-              blurRadius: 15,
-              spreadRadius: 5,
-            ),
-          ],
+Widget _buildMechanicMarker() {
+  return Transform.rotate(
+    angle: _heading * math.pi / 180,
+    child: Container(
+      width: 50,
+      height: 50,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Colors.white,
+          width: 3,
         ),
-        child: ClipOval(
-          child: Image.asset('assets/images/bengkel.jpg', fit: BoxFit.cover),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blue.withOpacity(0.5),
+            blurRadius: 15,
+            spreadRadius: 5,
+          ),
+        ],
+      ),
+      child: ClipOval(
+        child: Image.asset(
+          'assets/images/bengkel.jpg',
+          fit: BoxFit.cover,
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   static Widget _buildCustomerMarker() {
     return Container(

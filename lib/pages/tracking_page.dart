@@ -165,14 +165,13 @@ class _TrackingPageState extends State<TrackingPage> {
                                 ),
                                 const SizedBox(height: 17),
                                 _ProgressSteps(status: tracking.status),
-                                const SizedBox(height: 16),
-                                _MechanicCard(
-                                  tracking: tracking,
-                                  onChat:
-                                      () => _navigateToChat(
-                                        context,
-                                        currentMechanicName,
-                                      ), // ✅ Oper nama asli
+                                Text(
+                                  'STATUS: ${tracking.status}',
+                                  style: const TextStyle(
+                                    color: Colors.red,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                                 const SizedBox(height: 14),
                                 _CostCard(
@@ -475,12 +474,12 @@ class _ProgressSteps extends StatelessWidget {
   final String status;
 
   int get _activeStep {
-    if (status == 'pending') return 1;
+    if (status == 'pending') return 2;
     if (status == 'paid') return 2;
     if (status == 'on_the_way') return 3;
     if (status == 'service') return 4;
     if (status == 'completed') return 5;
-    return 1;
+    return 2;
   }
 
   @override

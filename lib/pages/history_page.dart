@@ -84,11 +84,22 @@ class _HistoryPageState extends State<HistoryPage> {
 
   HistoryStatus _parseStatus(String? status) {
     final s = status?.toLowerCase() ?? '';
-    if (s == 'pending' || s == 'processing' || s == 'process') {
+
+    if (
+        s == 'pending' ||
+        s == 'paid' ||
+        s == 'processing' ||
+        s == 'process' ||
+        s == 'on_the_way' ||
+        s == 'service'
+    ) {
       return HistoryStatus.process;
-    } else if (s == 'canceled' || s == 'batal') {
+    }
+
+    if (s == 'canceled' || s == 'batal') {
       return HistoryStatus.canceled;
     }
+
     return HistoryStatus.done;
   }
 
