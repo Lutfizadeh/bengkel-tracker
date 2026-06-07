@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 
-import '../constants/app_assets.dart';
 import '../constants/app_colors.dart';
+import '../constants/app_assets.dart';
+import '../services/api.dart'; // Sesuaikan path ApiService Anda
+import '../services/local_data_service.dart'; // Mengambil data profil user lokal
 import '../widgets/bottom_navbar.dart';
+import 'chat_detail_page.dart';
 import 'chat_list_page.dart';
 import 'home_page.dart';
 import 'service_page.dart';
@@ -20,6 +24,46 @@ class HistoryPage extends StatefulWidget {
 
 class _HistoryPageState extends State<HistoryPage> {
   HistoryStatus? selectedStatus;
+  List<dynamic> _orders = [];
+  bool _isLoading = true;
+  String _totalSpending = "Rp 0";
+  int _transactionCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchOrderHistory();
+  }
+
+  // --- Ambil Data Menggunakan Dio Client ---
+  Future<void> _fetchOrderHistory() async {
+    setState(() => _isLoading = true);
+    try {
+      final response = await ApiService.client.get('/orders');
+
+      if (response.statusCode == 200 && response.data != null) {
+        final List<dynamic> fetchedOrders = response.data['data'] ?? [];
+
+        int total = 0;
+        for (var order in fetchedOrders) {
+          final status = order['status']?.toString().toLowerCase() ?? '';
+          if (status == 'completed' || status == 'done') {
+            total += int.tryParse(order['total_cost']?.toString() ?? '0') ?? 0;
+          }
+        }
+
+        setState(() {
+          _orders = fetchedOrders;
+          _transactionCount = fetchedOrders.length;
+          _totalSpending = _formatRupiah(total);
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      debugPrint("Error fetching order histories: $e");
+    }
+  }
 
   void _goHome(BuildContext context) {
     Navigator.of(context).pushAndRemoveUntil(
@@ -28,76 +72,28 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  List<_HistoryData> get histories => [
-    const _HistoryData(
-      orderId: 1,
-      asset: AppAssets.slamet,
-      title: 'Bengkel Pak Slamet',
-      service: 'Mogok / Mesin',
-      detail: 'Biaya panggilan + servis offline',
-      date: '22 Apr 2026 · 09:45',
-      callFee: 'Rp 25.000',
-      finalPrice: 'Rp 100.000',
-      status: HistoryStatus.done,
-      isRated: false,
-    ),
-    const _HistoryData(
-      orderId: 2,
-      asset: AppAssets.karya,
-      title: 'Auto Karya Motor',
-      service: 'Ganti Ban + Tambal',
-      detail: 'Biaya panggilan + servis offline',
-      date: '14 Apr 2026 · 14:20',
-      callFee: 'Rp 25.000',
-      finalPrice: 'Rp 75.000',
-      status: HistoryStatus.done,
-      isRated: true,
-    ),
-    const _HistoryData(
-      orderId: 3,
-      asset: AppAssets.lainnya,
-      title: 'Setia Motor',
-      service: 'Aki Drop + Kabel',
-      detail: 'Mekanik sedang menangani kendaraan',
-      date: '22 Apr 2026 · 10:15',
-      callFee: 'Rp 25.000',
-      finalPrice: '-',
-      status: HistoryStatus.process,
-      isRated: false,
-    ),
-    const _HistoryData(
-      orderId: 4,
-      asset: '',
-      title: 'Novi Garage',
-      service: 'Tune Up + Karburator',
-      detail: 'Biaya panggilan + servis offline',
-      date: '10 Apr 2026 · 13:00',
-      callFee: 'Rp 25.000',
-      finalPrice: 'Rp 65.000',
-      status: HistoryStatus.done,
-      isRated: false,
-      garage: true,
-    ),
-    const _HistoryData(
-      orderId: 5,
-      asset: AppAssets.ban,
-      title: 'Bengkel Jaya Motor',
-      service: 'Ban Bocor',
-      detail: 'Pesanan dibatalkan oleh pengguna',
-      date: '09 Apr 2026 · 11:30',
-      callFee: 'Rp 25.000',
-      finalPrice: '-',
-      status: HistoryStatus.canceled,
-      isRated: false,
-    ),
-  ];
+  // --- Filter Status Berdasarkan Response API ---
+  List<dynamic> get filteredHistories {
+    if (selectedStatus == null) return _orders;
 
-  List<_HistoryData> get filteredHistories {
-    if (selectedStatus == null) {
-      return histories;
+    return _orders.where((item) {
+      final status = _parseStatus(item['status']);
+      return status == selectedStatus;
+    }).toList();
+  }
+
+  HistoryStatus _parseStatus(String? status) {
+    final s = status?.toLowerCase() ?? '';
+    if (s == 'pending' || s == 'processing' || s == 'process') {
+      return HistoryStatus.process;
+    } else if (s == 'canceled' || s == 'batal') {
+      return HistoryStatus.canceled;
     }
+    return HistoryStatus.done;
+  }
 
-    return histories.where((item) => item.status == selectedStatus).toList();
+  String _formatRupiah(int number) {
+    return "Rp ${number.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}";
   }
 
   @override
@@ -109,60 +105,75 @@ class _HistoryPageState extends State<HistoryPage> {
         child: Stack(
           children: [
             Positioned.fill(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: 100),
-                physics: const BouncingScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeader(context),
-                    const SizedBox(height: 12),
-                    _Tabs(
-                      selectedStatus: selectedStatus,
-                      onChanged: (status) {
-                        setState(() {
-                          selectedStatus = status;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
+              child:
+                  _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : RefreshIndicator(
+                        onRefresh: _fetchOrderHistory,
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.only(bottom: 100),
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildHeader(context),
+                              const SizedBox(height: 12),
+                              _Tabs(
+                                selectedStatus: selectedStatus,
+                                onChanged: (status) {
+                                  setState(() {
+                                    selectedStatus = status;
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: 16),
+                              if (filteredHistories.isEmpty)
+                                const Padding(
+                                  padding: EdgeInsets.all(20),
+                                  child: Center(
+                                    child: Text(
+                                      'Tidak ada history pada filter ini.',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.gray,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              else
+                                ...filteredHistories.map((item) {
+                                  final int totalCost =
+                                      int.tryParse(
+                                        item['total_cost']?.toString() ?? '0',
+                                      ) ??
+                                      0;
+                                  final statusEnum = _parseStatus(
+                                    item['status'],
+                                  );
 
-                    if (filteredHistories.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(20),
-                        child: Center(
-                          child: Text(
-                            'Tidak ada history pada filter ini.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.gray,
-                            ),
+                                  return _HistoryCard(
+                                    orderId: item['id'] ?? 0,
+                                    asset: AppAssets.slamet,
+                                    title:
+                                        item['workshop_name'] != null
+                                            ? "Bengkel ${item['workshop_name']}"
+                                            : "Mekanik ${item['mechanic_name'] ?? 'Bengkel Track'}",
+                                    service: item['problem'] ?? 'Servis Umum',
+                                    detail:
+                                        "Kode Order: ${item['order_code'] ?? '-'}",
+                                    date: item['created_at'] ?? '',
+                                    callFee: "Rp 25.000",
+                                    finalPrice: _formatRupiah(totalCost),
+                                    status: statusEnum,
+                                    isRated: item['is_rated'] ?? false,
+                                  );
+                                }),
+                              _buildMonthlySummary(),
+                            ],
                           ),
                         ),
-                      )
-                    else
-                      ...filteredHistories.map((item) {
-                        return _HistoryCard(
-                          orderId: item.orderId,
-                          asset: item.asset,
-                          title: item.title,
-                          service: item.service,
-                          detail: item.detail,
-                          date: item.date,
-                          callFee: item.callFee,
-                          finalPrice: item.finalPrice,
-                          status: item.status,
-                          isRated: item.isRated,
-                          garage: item.garage,
-                        );
-                      }),
-
-                    _buildMonthlySummary(),
-                  ],
-                ),
-              ),
+                      ),
             ),
-
             BottomNavbar(
               activeIndex: 1,
               onCenterTap: () {
@@ -178,9 +189,9 @@ class _HistoryPageState extends State<HistoryPage> {
                 );
               },
               onProfileTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ProfilePage()),
-                );
+                Navigator.of(
+                  context,
+                ).push(MaterialPageRoute(builder: (_) => const ProfilePage()));
               },
             ),
           ],
@@ -201,14 +212,6 @@ class _HistoryPageState extends State<HistoryPage> {
             child: CircleAvatar(
               radius: 65,
               backgroundColor: AppColors.blueNavy,
-            ),
-          ),
-          const Positioned(
-            left: 19,
-            top: 16,
-            child: Text(
-              '19:22',
-              style: TextStyle(color: AppColors.gray, fontSize: 12),
             ),
           ),
           Positioned(
@@ -261,7 +264,7 @@ class _HistoryPageState extends State<HistoryPage> {
   Widget _buildMonthlySummary() {
     return Container(
       height: 66,
-      margin: const EdgeInsets.fromLTRB(16, 2, 16, 0),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: AppColors.white,
@@ -270,19 +273,19 @@ class _HistoryPageState extends State<HistoryPage> {
       ),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Total pengeluaran bulan ini',
+                const Text(
+                  'Total pengeluaran (Selesai)',
                   style: TextStyle(fontSize: 12, color: AppColors.gray),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
-                  '4 transaksi · termasuk biaya servis offline',
-                  style: TextStyle(fontSize: 10.5, color: AppColors.gray),
+                  '$_transactionCount transaksi terdaftar',
+                  style: const TextStyle(fontSize: 10.5, color: AppColors.gray),
                 ),
               ],
             ),
@@ -291,9 +294,12 @@ class _HistoryPageState extends State<HistoryPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              const Text(
-                'Rp 420.000',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+              Text(
+                _totalSpending,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 5),
               Container(
@@ -306,7 +312,7 @@ class _HistoryPageState extends State<HistoryPage> {
                   borderRadius: BorderRadius.circular(7),
                 ),
                 child: const Text(
-                  'Dari input admin',
+                  'Render API',
                   style: TextStyle(
                     fontSize: 10,
                     color: AppColors.orange,
@@ -324,7 +330,6 @@ class _HistoryPageState extends State<HistoryPage> {
 
 class _Tabs extends StatelessWidget {
   const _Tabs({required this.selectedStatus, required this.onChanged});
-
   final HistoryStatus? selectedStatus;
   final ValueChanged<HistoryStatus?> onChanged;
 
@@ -350,7 +355,6 @@ class _Tabs extends StatelessWidget {
         children:
             tabs.map((tab) {
               final active = selectedStatus == tab.status;
-
               return Expanded(
                 child: GestureDetector(
                   onTap: () => onChanged(tab.status),
@@ -381,40 +385,11 @@ class _Tabs extends StatelessWidget {
 
 class _TabItem {
   const _TabItem({required this.label, required this.status});
-
   final String label;
   final HistoryStatus? status;
 }
 
 enum HistoryStatus { done, process, canceled }
-
-class _HistoryData {
-  const _HistoryData({
-    required this.orderId,
-    required this.asset,
-    required this.title,
-    required this.service,
-    required this.detail,
-    required this.date,
-    required this.callFee,
-    required this.finalPrice,
-    required this.status,
-    required this.isRated,
-    this.garage = false,
-  });
-
-  final int orderId;
-  final String asset;
-  final String title;
-  final String service;
-  final String detail;
-  final String date;
-  final String callFee;
-  final String finalPrice;
-  final HistoryStatus status;
-  final bool isRated;
-  final bool garage;
-}
 
 class _HistoryCard extends StatelessWidget {
   const _HistoryCard({
@@ -432,19 +407,51 @@ class _HistoryCard extends StatelessWidget {
   });
 
   final int orderId;
-  final String asset;
-  final String title;
-  final String service;
-  final String detail;
-  final String date;
-  final String callFee;
-  final String finalPrice;
+  final String asset, title, service, detail, date, callFee, finalPrice;
   final HistoryStatus status;
-  final bool isRated;
-  final bool garage;
+  final bool isRated, garage;
 
   bool get isProcess => status == HistoryStatus.process;
   bool get isDone => status == HistoryStatus.done;
+
+  Future<void> _navigateToChatRoom(BuildContext context) async {
+    try {
+      final profile = await LocalDataService.getProfile();
+      final int currentUserId = int.tryParse(profile['id'].toString()) ?? 1;
+
+      final response = await ApiService.client.post(
+        '/chat-rooms',
+        data: {'order_id': orderId},
+      );
+
+      if ((response.statusCode == 200 || response.statusCode == 201) &&
+          response.data != null) {
+        final int chatRoomId = response.data['data']['id'];
+
+        if (!context.mounted) return;
+
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder:
+                (_) => ChatDetailPage(
+                  chatRoomId: chatRoomId,
+                  currentUserId: currentUserId,
+                  receiverName:
+                      title, // ✅ Perbaikan: Mengirimkan string judul nama mekanik/bengkel secara dinamis
+                ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("Gagal memuat chat room dari history order: $e");
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Gagal menghubungkan ke layanan chat mekanik.'),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -479,7 +486,27 @@ class _HistoryCard extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildImage(),
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: garage ? AppColors.paleOrange : AppColors.black,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Center(
+                        child:
+                            garage
+                                ? const Text(
+                                  'GARAGE',
+                                  style: TextStyle(
+                                    color: Color(0xFFFF2965),
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                )
+                                : Image.asset(asset, width: 42),
+                      ),
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -548,39 +575,13 @@ class _HistoryCard extends StatelessWidget {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 10),
-
                 if (isProcess) _buildProcessActions(context),
                 if (isDone) _buildDoneActions(context),
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildImage() {
-    return Container(
-      width: 48,
-      height: 48,
-      decoration: BoxDecoration(
-        color: garage ? AppColors.paleOrange : AppColors.black,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Center(
-        child:
-            garage
-                ? const Text(
-                  'GARAGE',
-                  style: TextStyle(
-                    color: Color(0xFFFF2965),
-                    fontSize: 8,
-                    fontWeight: FontWeight.w800,
-                  ),
-                )
-                : Image.asset(asset, width: 42),
       ),
     );
   }
@@ -606,11 +607,10 @@ class _HistoryCard extends StatelessWidget {
           child: _SmallActionButton(
             text: 'Hubungi',
             filled: false,
-            onTap: () {
-              Navigator.of(
-                context,
-              ).push(MaterialPageRoute(builder: (_) => const ChatListPage()));
-            },
+            onTap:
+                () => _navigateToChatRoom(
+                  context,
+                ), // ✅ SELESAI: Menjalankan fungsi rute terverifikasi
           ),
         ),
       ],
@@ -639,7 +639,6 @@ class _HistoryCard extends StatelessWidget {
             disabled: isRated,
             onTap: () {
               if (isRated) return;
-
               Navigator.of(
                 context,
               ).push(MaterialPageRoute(builder: (_) => const RatingPage()));
@@ -658,7 +657,6 @@ class _SmallActionButton extends StatelessWidget {
     required this.onTap,
     this.disabled = false,
   });
-
   final String text;
   final bool filled;
   final VoidCallback onTap;
@@ -672,14 +670,12 @@ class _SmallActionButton extends StatelessWidget {
             : filled
             ? AppColors.navy
             : AppColors.white;
-
     final textColor =
         disabled
             ? AppColors.gray
             : filled
             ? AppColors.white
             : AppColors.orange;
-
     final borderColor =
         disabled
             ? const Color(0xFFE5E7EB)
@@ -712,7 +708,6 @@ class _SmallActionButton extends StatelessWidget {
 
 class _Status extends StatelessWidget {
   const _Status({required this.status});
-
   final HistoryStatus status;
 
   @override
@@ -726,21 +721,18 @@ class _Status extends StatelessWidget {
             : process
             ? const Color(0xFFFEF3C7)
             : AppColors.lightGreen;
-
     final Color dotColor =
         canceled
             ? Colors.red
             : process
             ? AppColors.yellow
             : AppColors.brightGreen;
-
     final Color textColor =
         canceled
             ? Colors.red
             : process
             ? AppColors.brown
             : AppColors.green;
-
     final String label =
         canceled
             ? 'Batal'

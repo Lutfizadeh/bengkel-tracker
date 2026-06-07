@@ -10,6 +10,8 @@ import '../constants/app_assets.dart';
 import '../constants/app_colors.dart';
 import '../models/order_tracking.dart';
 import '../services/order_service.dart';
+import '../services/api.dart';
+import '../services/local_data_service.dart';
 import '../widgets/bottom_navbar.dart';
 import 'chat_detail_page.dart';
 import 'chat_list_page.dart';
@@ -17,47 +19,23 @@ import 'history_page.dart';
 import 'home_page.dart';
 
 class TrackingPage extends StatefulWidget {
-  const TrackingPage({
-    super.key,
-    this.orderId = 1,
-  });
+  const TrackingPage({super.key, this.orderId = 1});
 
   final int orderId;
 
   @override
-  State<TrackingPage> createState() =>
-      _TrackingPageState();
+  State<TrackingPage> createState() => _TrackingPageState();
 }
 
-class _TrackingPageState
-    extends State<TrackingPage> {
-
+class _TrackingPageState extends State<TrackingPage> {
   late Future<OrderTracking> trackingFuture;
-
   Timer? refreshTimer;
+  bool _isNavigatingToChat = false;
 
   @override
   void initState() {
     super.initState();
-
-    trackingFuture =
-        OrderService.getTracking(
-      widget.orderId,
-    );
-
-    /* refreshTimer = Timer.periodic(
-      const Duration(seconds: 5),
-      (_) {
-        if (!mounted) return;
-
-        setState(() {
-          trackingFuture =
-              OrderService.getTracking(
-            widget.orderId,
-          );
-        });
-      },
-    ); */
+    trackingFuture = OrderService.getTracking(widget.orderId);
   }
 
   @override
@@ -66,16 +44,61 @@ class _TrackingPageState
     super.dispose();
   }
 
-  void _goHome(BuildContext context) => Navigator.of(context).pushAndRemoveUntil(
+  void _goHome(BuildContext context) =>
+      Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const HomePage()),
         (_) => false,
       );
 
   String _formatRupiah(int value) {
-    return 'Rp ${value.toString().replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (match) => '${match[1]}.',
-        )}';
+    return 'Rp ${value.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (match) => '${match[1]}.')}';
+  }
+
+  // ✅ PERBAIKAN: Menambahkan parameter receiverName dinamis dari data tracking mekanik
+  Future<void> _navigateToChat(
+    BuildContext context,
+    String mechanicName,
+  ) async {
+    if (_isNavigatingToChat) return;
+
+    setState(() => _isNavigatingToChat = true);
+
+    try {
+      final profile = await LocalDataService.getProfile();
+      final int currentUserId = int.tryParse(profile['id'].toString()) ?? 1;
+
+      final response = await ApiService.client.post(
+        '/chat-rooms',
+        data: {'order_id': widget.orderId},
+      );
+
+      if ((response.statusCode == 200 || response.statusCode == 201) &&
+          response.data != null) {
+        final int chatRoomId = response.data['data']['id'];
+
+        if (!mounted) return;
+
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder:
+                (_) => ChatDetailPage(
+                  chatRoomId: chatRoomId,
+                  currentUserId: currentUserId,
+                  receiverName: mechanicName, // ✅ Oper nama mekanik dinamis
+                ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("Gagal memuat room chat dari tracking: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal menghubungkan ke layanan chat.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isNavigatingToChat = false);
+    }
   }
 
   @override
@@ -86,14 +109,12 @@ class _TrackingPageState
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             backgroundColor: AppColors.background,
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
+            body: Center(child: CircularProgressIndicator()),
           );
         }
 
         if (snapshot.hasError) {
-          return Scaffold(
+          return const Scaffold(
             backgroundColor: AppColors.background,
             body: Center(
               child: Padding(
@@ -108,13 +129,8 @@ class _TrackingPageState
         }
 
         final tracking = snapshot.data!;
-        print(
-          'MEKANIK: '
-          '${tracking.mechanicLatitude}, '
-          '${tracking.mechanicLongitude}',
-        );
-
-        print('STATUS TRACKING = ${tracking.status}');
+        final String currentMechanicName =
+            tracking.mechanicName ?? 'Mekanik Bengkel';
 
         return Scaffold(
           backgroundColor: AppColors.background,
@@ -152,11 +168,11 @@ class _TrackingPageState
                                 const SizedBox(height: 16),
                                 _MechanicCard(
                                   tracking: tracking,
-                                  onChat: () => Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => const ChatDetailPage(),
-                                    ),
-                                  ),
+                                  onChat:
+                                      () => _navigateToChat(
+                                        context,
+                                        currentMechanicName,
+                                      ), // ✅ Oper nama asli
                                 ),
                                 const SizedBox(height: 14),
                                 _CostCard(
@@ -169,13 +185,13 @@ class _TrackingPageState
                                   width: double.infinity,
                                   height: 49,
                                   child: ElevatedButton(
-                                    onPressed: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => const ChatDetailPage(),
-                                      ),
-                                    );
-                                  },
+                                    onPressed:
+                                        _isNavigatingToChat
+                                            ? null
+                                            : () => _navigateToChat(
+                                              context,
+                                              currentMechanicName,
+                                            ), // ✅ Oper nama asli
                                     style: ElevatedButton.styleFrom(
                                       elevation: 0,
                                       backgroundColor: AppColors.orange,
@@ -184,13 +200,23 @@ class _TrackingPageState
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                     ),
-                                    child: const Text(
-                                      'Hubungi Mekanik',
-                                      style: TextStyle(
-                                        fontSize: 15.5,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
+                                    child:
+                                        _isNavigatingToChat
+                                            ? const SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                color: AppColors.white,
+                                                strokeWidth: 2,
+                                              ),
+                                            )
+                                            : const Text(
+                                              'Hubungi Mekanik',
+                                              style: TextStyle(
+                                                fontSize: 15.5,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
                                   ),
                                 ),
                               ],
@@ -205,12 +231,14 @@ class _TrackingPageState
                   activeIndex: 2,
                   onCenterTap: () {},
                   onHomeTap: () => _goHome(context),
-                  onHistoryTap: () => Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (_) => const HistoryPage()),
-                  ),
-                  onChatTap: () => Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (_) => const ChatListPage()),
-                  ),
+                  onHistoryTap:
+                      () => Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(builder: (_) => const HistoryPage()),
+                      ),
+                  onChatTap:
+                      () => Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(builder: (_) => const ChatListPage()),
+                      ),
                 ),
               ],
             ),
@@ -222,10 +250,7 @@ class _TrackingPageState
 }
 
 class _MapArea extends StatefulWidget {
-  const _MapArea({
-    required this.tracking,
-  });
-
+  const _MapArea({required this.tracking});
   final OrderTracking tracking;
 
   @override
@@ -234,29 +259,22 @@ class _MapArea extends StatefulWidget {
 
 class _MapAreaState extends State<_MapArea> {
   List<LatLng> routePoints = [];
-  bool isRouteLoading = false; // ubah ini
+  bool isRouteLoading = false;
 
   @override
-    void didUpdateWidget(covariant _MapArea oldWidget) {
-      super.didUpdateWidget(oldWidget);
-
-      if (widget.tracking.mechanicLatitude !=
-              oldWidget.tracking.mechanicLatitude ||
-          widget.tracking.mechanicLongitude !=
-              oldWidget.tracking.mechanicLongitude) {
-
-        _loadRoute();
-      }
+  void didUpdateWidget(covariant _MapArea oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.tracking.mechanicLatitude !=
+            oldWidget.tracking.mechanicLatitude ||
+        widget.tracking.mechanicLongitude !=
+            oldWidget.tracking.mechanicLongitude) {
+      _loadRoute();
     }
+  }
 
   Future<void> _loadRoute() async {
     final tracking = widget.tracking;
-
-    final userPoint = LatLng(
-      tracking.userLatitude,
-      tracking.userLongitude,
-    );
-
+    final userPoint = LatLng(tracking.userLatitude, tracking.userLongitude);
     final mechanicPoint = LatLng(
       tracking.mechanicLatitude ?? tracking.userLatitude,
       tracking.mechanicLongitude ?? tracking.userLongitude,
@@ -271,28 +289,25 @@ class _MapAreaState extends State<_MapArea> {
       );
 
       final response = await http.get(url);
-
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body);
         final routes = result['routes'] as List;
 
         if (routes.isNotEmpty) {
           final coordinates = routes.first['geometry']['coordinates'] as List;
-
-          final points = coordinates.map<LatLng>((coord) {
-            return LatLng(
-              double.parse(coord[1].toString()),
-              double.parse(coord[0].toString()),
-            );
-          }).toList();
+          final points =
+              coordinates.map<LatLng>((coord) {
+                return LatLng(
+                  double.parse(coord[1].toString()),
+                  double.parse(coord[0].toString()),
+                );
+              }).toList();
 
           if (!mounted) return;
-
           setState(() {
             routePoints = points;
             isRouteLoading = false;
           });
-
           return;
         }
       }
@@ -301,12 +316,8 @@ class _MapAreaState extends State<_MapArea> {
     }
 
     if (!mounted) return;
-
     setState(() {
-      routePoints = [
-        userPoint,
-        mechanicPoint,
-      ];
+      routePoints = [userPoint, mechanicPoint];
       isRouteLoading = false;
     });
   }
@@ -314,12 +325,7 @@ class _MapAreaState extends State<_MapArea> {
   @override
   Widget build(BuildContext context) {
     final tracking = widget.tracking;
-
-    final userPoint = LatLng(
-      tracking.userLatitude,
-      tracking.userLongitude,
-    );
-
+    final userPoint = LatLng(tracking.userLatitude, tracking.userLongitude);
     final mechanicPoint = LatLng(
       tracking.mechanicLatitude ?? tracking.userLatitude,
       tracking.mechanicLongitude ?? tracking.userLongitude,
@@ -332,13 +338,8 @@ class _MapAreaState extends State<_MapArea> {
 
     final mechanicName = tracking.mechanicName ?? 'Mekanik';
     final shortName = mechanicName.split(' ').take(2).join(' ');
-
-    final polylinePoints = routePoints.isEmpty
-        ? [
-            userPoint,
-            mechanicPoint,
-          ]
-        : routePoints;
+    final polylinePoints =
+        routePoints.isEmpty ? [userPoint, mechanicPoint] : routePoints;
 
     return SizedBox(
       height: 304,
@@ -453,32 +454,10 @@ class _MapAreaState extends State<_MapArea> {
               ),
               child: const Text(
                 '19:22',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textDark,
-                ),
+                style: TextStyle(fontSize: 12, color: AppColors.textDark),
               ),
             ),
           ),
-          /* if (isRouteLoading)
-            Positioned(
-              right: 18,
-              top: 16,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppColors.white.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'Mencari rute...',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textDark,
-                  ),
-                ),
-              ),
-            ), */
         ],
       ),
     );
@@ -486,34 +465,27 @@ class _MapAreaState extends State<_MapArea> {
 }
 
 class _ProgressSteps extends StatelessWidget {
-  const _ProgressSteps({
-    required this.status,
-  });
-
+  const _ProgressSteps({required this.status});
   final String status;
 
-int get _activeStep {
+  int get _activeStep {
     if (status == 'pending') return 1;
     if (status == 'paid') return 2;
     if (status == 'on_the_way') return 3;
     if (status == 'service') return 4;
     if (status == 'completed') return 5;
-
-    // Karena user masuk halaman tracking setelah bayar biaya panggilan,
-    // default-nya dianggap sudah lunas.
     return 1;
   }
 
   @override
   Widget build(BuildContext context) {
-  final steps = [
-        ('✓', 'Order'),
-        ('💳', 'Lunas'),
-        ('🔧', 'Menuju'),
-        ('🛠', 'Servis'),
-        ('✅', 'Selesai'),
-      ];
-
+    final steps = [
+      ('✓', 'Order'),
+      ('💳', 'Lunas'),
+      ('🔧', 'Menuju'),
+      ('🛠', 'Servis'),
+      ('✅', 'Selesai'),
+    ];
     return Row(
       children: List.generate(steps.length, (i) {
         final s = steps[i];
@@ -529,7 +501,7 @@ int get _activeStep {
                       width: 28,
                       height: 28,
                       decoration: BoxDecoration(
-                          color: active ? AppColors.orange : AppColors.white,
+                        color: active ? AppColors.orange : AppColors.white,
                         border: Border.all(
                           color:
                               active ? AppColors.orange : AppColors.warmBorder,
@@ -541,7 +513,7 @@ int get _activeStep {
                           s.$1,
                           style: TextStyle(
                             fontSize: 12,
-                              color: active ? AppColors.white : AppColors.orange,
+                            color: active ? AppColors.white : AppColors.orange,
                           ),
                         ),
                       ),
@@ -561,9 +533,10 @@ int get _activeStep {
                 Container(
                   width: 28,
                   height: 1.4,
-                  color: i < _activeStep - 1
-                      ? AppColors.orange
-                      : AppColors.warmBorder,
+                  color:
+                      i < _activeStep - 1
+                          ? AppColors.orange
+                          : AppColors.warmBorder,
                 ),
             ],
           ),
@@ -574,11 +547,7 @@ int get _activeStep {
 }
 
 class _MechanicCard extends StatelessWidget {
-  const _MechanicCard({
-    required this.tracking,
-    required this.onChat,
-  });
-
+  const _MechanicCard({required this.tracking, required this.onChat});
   final OrderTracking tracking;
   final VoidCallback onChat;
 
@@ -586,9 +555,10 @@ class _MechanicCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final mechanicName = tracking.mechanicName ?? 'Belum ada mekanik';
     final mechanicStatus = tracking.mechanicStatus ?? '-';
-    final distance = tracking.mechanicDistanceKm != null
-        ? '${tracking.mechanicDistanceKm} km dari lokasi'
-        : 'Jarak belum tersedia';
+    final distance =
+        tracking.mechanicDistanceKm != null
+            ? '${tracking.mechanicDistanceKm} km dari lokasi'
+            : 'Jarak belum tersedia';
 
     return Container(
       height: 82,
@@ -606,9 +576,7 @@ class _MechanicCard extends StatelessWidget {
               color: AppColors.black,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Center(
-              child: Image.asset(AppAssets.slamet, width: 39),
-            ),
+            child: Center(child: Image.asset(AppAssets.slamet, width: 39)),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -628,10 +596,7 @@ class _MechanicCard extends StatelessWidget {
                 const SizedBox(height: 1),
                 Text(
                   'Status: ${mechanicStatus.toUpperCase()}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.gray,
-                  ),
+                  style: const TextStyle(fontSize: 11, color: AppColors.gray),
                 ),
                 const SizedBox(height: 3),
                 Text(
@@ -654,11 +619,7 @@ class _MechanicCard extends StatelessWidget {
 }
 
 class _IconButton extends StatelessWidget {
-  const _IconButton({
-    required this.icon,
-    required this.onTap,
-  });
-
+  const _IconButton({required this.icon, required this.onTap});
   final IconData icon;
   final VoidCallback onTap;
 
@@ -689,7 +650,8 @@ class _CostCard extends StatelessWidget {
 
   final int basicCost;
   final int totalCost;
-  final String Function(int value) formatRupiah;
+  final String Function(int value)
+  formatRupiah; // ✅ Hapus baris 'final String Alignment;' di atas ini
 
   @override
   Widget build(BuildContext context) {
@@ -742,9 +704,9 @@ class _CostCard extends StatelessWidget {
           const SizedBox(height: 12),
           Container(
             width: double.infinity,
-            padding: EdgeInsets.all(10),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Color(0xFFFFF4EA),
+              color: const Color(0xFFFFF4EA),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Text(

@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api.dart';
 import '../../constants/app_colors.dart';
 import '../auth/auth_gate.dart';
-import 'mechanic_menu_chat_page.dart';
+import 'mechanic_menu_chat_page.dart'; // ✅ Berkas list chat asli Anda
 import 'mechanic_home_page.dart';
 import 'mechanic_tracking_page.dart';
 import 'edit_mechanic_profile_page.dart';
@@ -17,10 +17,10 @@ class MechanicProfilePage extends StatefulWidget {
 
 class _MechanicProfilePageState extends State<MechanicProfilePage> {
   bool isOnline = true;
-
   String _mechanicName = 'Mekanik';
   String _mechanicEmail = '';
   bool _isLoading = true;
+  int _mechanicId = 1; // ✅ Simpan ID mekanik aktif secara dinamis
 
   @override
   void initState() {
@@ -34,39 +34,35 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
       setState(() {
         _mechanicName = prefs.getString('name') ?? 'Mekanik BengkelTrack';
         _mechanicEmail = prefs.getString('email') ?? '';
+        // Ambil ID mekanik dinamis untuk dipakai di endpoint status
+        _mechanicId = int.tryParse(prefs.getString('id') ?? '1') ?? 1;
         _isLoading = false;
       });
     }
   }
-  
+
   Future<void> _updateStatus(bool value) async {
     try {
+      // ✅ PERBAIKAN 1: Endpoint mengikuti ID mekanik yang sedang login secara dinamis
       await ApiService.client.patch(
-        '/mechanics/1/status',
-        data: {
-          'status': value ? 'open' : 'close',
-        },
+        '/mechanics/$_mechanicId/status',
+        data: {'status': value ? 'open' : 'close'},
       );
 
       setState(() {
         isOnline = value;
       });
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            value ? 'Status Online' : 'Status Offline',
-          ),
-        ),
+        SnackBar(content: Text(value ? 'Status Online' : 'Status Offline')),
       );
     } catch (e) {
-      print(e);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Gagal mengubah status'),
-        ),
-      );
+      debugPrint("Gagal mengubah status online mekanik: $e");
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Gagal mengubah status')));
     }
   }
 
@@ -106,12 +102,12 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
 
     if (konfirmasi == true) {
       final prefs = await SharedPreferences.getInstance();
-
       await prefs.setBool('is_logged_in', false);
       await prefs.remove('role');
       await prefs.remove('profile');
       await prefs.remove('name');
       await prefs.remove('email');
+      await prefs.remove('id');
 
       if (mounted) {
         Navigator.pushAndRemoveUntil(
@@ -197,7 +193,6 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
   Widget _buildHeader() {
     final String initialLetter =
         _mechanicName.isNotEmpty ? _mechanicName.trim()[0].toUpperCase() : 'M';
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(18, 40, 18, 24),
@@ -354,7 +349,7 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: const Text(
-                  'Mekanik Aktif',
+                  'Mekanik Info',
                   style: TextStyle(
                     color: Color(0xFFFFD0C2),
                     fontSize: 11,
@@ -549,18 +544,13 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
             title: 'Edit Profil',
             subtitle: 'Foto, nama, nomor HP',
             onTap: () async {
-              // Navigasi ke halaman edit profil mekanik
               final result = await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) => const EditMechanicProfilePage(),
                 ),
               );
-
-              // Jika kembali membawa status 'true', refresh data header profil otomatis
-              if (result == true) {
-                _loadMechanicData();
-              }
+              if (result == true) _loadMechanicData();
             },
           ),
           _itemDivider(),
@@ -730,10 +720,11 @@ class _MechanicProfilePageState extends State<MechanicProfilePage> {
               builder: (_) => const MechanicTrackingPage(hasActiveOrder: true),
             ),
           );
+        // ✅ PERBAIKAN 2: Navigasi menu chat dialihkan ke berkas asli MechanicMenuChatPage
         if (index == 2)
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => const MechanicChatListPage()),
+            MaterialPageRoute(builder: (_) => const MechanicMenuChatPage()),
           );
       },
       child: SizedBox(

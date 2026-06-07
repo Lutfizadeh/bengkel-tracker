@@ -4,8 +4,9 @@ import 'package:dio/dio.dart';
 import '../../constants/app_colors.dart';
 import 'mechanic_tracking_page.dart';
 import 'mechanic_menu_chat_page.dart';
-import 'mechanic_chat_page.dart';
 import 'mechanic_profile_page.dart';
+import '../../services/local_data_service.dart';
+import '../chat_detail_page.dart'; // ✅ Pastikan import ini ada
 
 class MechanicHomePage extends StatefulWidget {
   const MechanicHomePage({super.key});
@@ -18,31 +19,42 @@ class _MechanicHomePageState extends State<MechanicHomePage> {
   int activeIndex = 0;
   List<dynamic> orders = [];
   bool isLoading = true;
-  
+  int _currentUserId = 1;
+
   @override
   void initState() {
     super.initState();
-    loadOrders();
+    _initMechanicHome();
+  }
+
+  Future<void> _initMechanicHome() async {
+    await _loadMechanicId();
+    await loadOrders();
+  }
+
+  Future<void> _loadMechanicId() async {
+    final profile = await LocalDataService.getProfile();
+
+    setState(() {
+      // ✅ Mengambil ID user murni yang dikirim dari AuthController Laravel
+      _currentUserId = int.tryParse(profile['id'].toString()) ?? 1;
+    });
+
+    debugPrint("🔑 MEKANIK LOGIN ACTIVE USER_ID: $_currentUserId");
   }
 
   Future<void> loadOrders() async {
     try {
-      final response = await ApiService.client.get(
-        '/mechanic/orders',
-      );
-
+      final response = await ApiService.client.get('/mechanic/orders');
       setState(() {
-        orders = response.data['data'];
+        orders = response.data['data'] ?? [];
         isLoading = false;
       });
     } catch (e) {
-      print(e);
-
-      setState(() {
-        isLoading = false;
-      });
+      debugPrint("Error loading mechanic orders: $e");
+      setState(() => isLoading = false);
     }
-}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,34 +71,41 @@ class _MechanicHomePageState extends State<MechanicHomePage> {
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 24, 16, 95),
-                    child: isLoading
-                        ? const Center(
-                            child: CircularProgressIndicator(),
-                          )
-                        : Column(
-                            children: orders.map((order) {
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 14),
-                                child: _buildOrderCard(
-                                  isNew: true,
-                                  orderId: order['order_code'] ?? '',
-                                  dbOrderId: order['id'],
-                                  time: 'Baru',
-                                  customerName: order['customer_name'] ?? '',
-                                  phone: order['customer_phone'] ?? '',
-                                  address:
-                                      '${order['user_latitude']}, ${order['user_longitude']}',
-                                  serviceName: 'Servis Kendaraan',
-                                  problem: order['problem'] ?? '',
-                                  distance: '',
-                                  buttonType:
-                                      order['status'] == 'pending'
-                                          ? OrderButtonType.acceptReject
-                                          : OrderButtonType.tracking,
-                                ),
-                              );
-                            }).toList(),
-                          ),
+                    child:
+                        isLoading
+                            ? const Center(child: CircularProgressIndicator())
+                            : Column(
+                              children:
+                                  orders.map((order) {
+                                    final String currentStatus =
+                                        (order['status'] ?? 'pending')
+                                            .toString()
+                                            .toLowerCase();
+                                    return Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 14,
+                                      ),
+                                      child: _buildOrderCard(
+                                        isNew: currentStatus == 'pending',
+                                        orderId: order['order_code'] ?? '',
+                                        dbOrderId: order['id'] ?? 0,
+                                        time: 'Baru',
+                                        customerName:
+                                            order['customer_name'] ?? '',
+                                        phone: order['customer_phone'] ?? '',
+                                        address:
+                                            '${order['user_latitude']}, ${order['user_longitude']}',
+                                        serviceName: 'Servis Kendaraan',
+                                        problem: order['problem'] ?? '',
+                                        distance: '',
+                                        buttonType:
+                                            currentStatus == 'pending'
+                                                ? OrderButtonType.acceptReject
+                                                : OrderButtonType.tracking,
+                                      ),
+                                    );
+                                  }).toList(),
+                            ),
                   ),
                 ),
               ],
@@ -134,26 +153,28 @@ class _MechanicHomePageState extends State<MechanicHomePage> {
             child: Row(
               children: [
                 Expanded(
-                  child: 
-                   _buildCounterItem(
-                     title: 'Order Baru',
-                     value: orders
-                         .where((o) => o['status'] == 'pending')
-                         .length
-                         .toString(),
+                  child: _buildCounterItem(
+                    title: 'Order Baru',
+                    value:
+                        orders
+                            .where((o) => o['status'] == 'pending')
+                            .length
+                            .toString(),
                   ),
                 ),
                 Container(width: 1, height: 42, color: const Color(0xFFE5E7EB)),
                 Expanded(
-                  child:
-                  _buildCounterItem(
+                  child: _buildCounterItem(
                     title: 'Order Aktif',
-                    value: orders
-                        .where((o) =>
-                            o['status'] == 'on_the_way' ||
-                            o['status'] == 'service')
-                        .length
-                        .toString(),
+                    value:
+                        orders
+                            .where(
+                              (o) =>
+                                  o['status'] == 'on_the_way' ||
+                                  o['status'] == 'service',
+                            )
+                            .length
+                            .toString(),
                   ),
                 ),
               ],
@@ -294,10 +315,90 @@ class _MechanicHomePageState extends State<MechanicHomePage> {
             ),
           ],
           const SizedBox(height: 16),
-          if (buttonType == OrderButtonType.tracking)
-            _buildTrackingAction(distance, dbOrderId,)
-          else
-            _buildAcceptRejectAction(dbOrderId),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              SizedBox(
+                width: 38,
+                height: 38,
+                child: Material(
+                  color: const Color(0xFFF9B55F),
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () async {
+                      try {
+                        final response = await ApiService.client.post(
+                          '/chat-rooms',
+                          data: {'order_id': dbOrderId},
+                        );
+                        if (response.statusCode == 200 ||
+                            response.statusCode == 201) {
+                          final int roomChatId = response.data['data']['id'];
+                          if (!mounted) return;
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (_) => ChatDetailPage(
+                                    chatRoomId: roomChatId,
+                                    currentUserId: _currentUserId,
+                                    receiverName: customerName,
+                                  ),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        debugPrint("Gagal memuat kamar chat: $e");
+                      }
+                    },
+                    child: const Icon(
+                      Icons.chat_bubble_rounded,
+                      size: 18,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child:
+                    buttonType == OrderButtonType.tracking
+                        ? SizedBox(
+                          height: 38,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder:
+                                      (_) => MechanicTrackingPage(
+                                        orderId: dbOrderId,
+                                      ),
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFFF7043),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: const Text(
+                              'Lihat Tracking Map',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        )
+                        : _buildAcceptRejectAction(dbOrderId),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -349,114 +450,6 @@ class _MechanicHomePageState extends State<MechanicHomePage> {
     );
   }
 
-  Widget _buildTrackingAction(String distance, int orderId,) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(
-                  text: '$distance\n',
-                  style: const TextStyle(
-                    color: Color(0xFF111827),
-                    fontSize: 21,
-                    fontWeight: FontWeight.w900,
-                    height: 1.1,
-                  ),
-                ),
-                const TextSpan(
-                  text: 'dari lokasi Anda',
-                  style: TextStyle(
-                    color: Color(0xFF6B7280),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        const SizedBox(width: 8),
-
-        // Tombol chat
-        SizedBox(
-          width: 38,
-          height: 38,
-          child: Material(
-            color: const Color(0xFFF9B55F),
-            shape: const CircleBorder(),
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder:
-                        (_) => const MechanicChatPage(
-                          customerName: 'Budi Speed',
-                          orderId: '#ORD-20240521-001',
-                        ),
-                  ),
-                );
-              },
-              child: const Icon(
-                Icons.chat_bubble_rounded,
-                size: 18,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ),
-
-        const SizedBox(width: 8),
-
-        // Tombol tracking
-        ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 92, maxWidth: 110),
-          child: SizedBox(
-            height: 38,
-            child: ElevatedButton(
-            onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => MechanicTrackingPage(orderId: orderId,),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF7043),
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: const FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  'Tracking',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  softWrap: false,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  } 
-
   Widget _buildAcceptRejectAction(int orderId) {
     return Row(
       children: [
@@ -464,9 +457,7 @@ class _MechanicHomePageState extends State<MechanicHomePage> {
           child: SizedBox(
             height: 39,
             child: ElevatedButton(
-              onPressed: () {
-                // nanti aksi tolak order
-              },
+              onPressed: () {},
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFF3F4F6),
                 elevation: 0,
@@ -492,43 +483,48 @@ class _MechanicHomePageState extends State<MechanicHomePage> {
             child: ElevatedButton(
               onPressed: () async {
                 try {
-                  print('TOMBOL TERIMA ORDER DIKLIK');
-
                   final response = await ApiService.client.post(
                     '/orders/$orderId/accept',
                   );
-
-                  print('STATUS CODE: ${response.statusCode}');
-                  print('RESPONSE: ${response.data}');
-
                   if (response.statusCode == 200) {
                     if (!mounted) return;
-
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Order berhasil diterima'),
-                      ),
+                      const SnackBar(content: Text('Order berhasil diterima')),
                     );
+
+                    // Segera refresh list orderan di halaman utama
+                    loadOrders();
 
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => MechanicTrackingPage(
-                          orderId: orderId,
-                        ),
+                        builder: (_) => MechanicTrackingPage(orderId: orderId),
                       ),
                     );
                   }
-                } catch (e) {
-                  print('ERROR ACCEPT ORDER: $e');
-
+                } on DioException catch (e) {
+                  debugPrint('ERROR ACCEPT ORDER: $e');
                   if (!mounted) return;
 
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Gagal menerima order: $e'),
-                    ),
-                  );
+                  // 🔴 SINKRONISASI ATURAN BISNIS: Tangkap Status 422 dari Laravel OrderController
+                  if (e.response != null && e.response?.statusCode == 422) {
+                    final String msg =
+                        e.response?.data['message'] ??
+                        'Masih ada orderan aktif yang sedang dikerjakan.';
+
+                    // Tampilkan dialog pop-up peringatan kustom
+                    _showConflictOrderDialog(context, msg);
+                  } else {
+                    // Penanganan error umum (koneksi internet, server tumbang, dll)
+                    final String genericMsg =
+                        e.response?.data['message'] ?? 'Gagal menerima order';
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(genericMsg),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -550,6 +546,68 @@ class _MechanicHomePageState extends State<MechanicHomePage> {
           ),
         ),
       ],
+    );
+  }
+
+  void _showConflictOrderDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      barrierDismissible:
+          false, // Mekanik wajib mengklik tombol aksi untuk menutup dialog
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Row(
+            children: [
+              Icon(
+                Icons.warning_amber_rounded,
+                color: Color(0xFFFF7043),
+                size: 26,
+              ),
+              SizedBox(width: 10),
+              Text(
+                'Perhatian',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: Color(0xFF10163A),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            message, // Menampilkan string pesan "Masih ada order yang sedang dikerjakan" dari Laravel
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF4B5563),
+              height: 1.4,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: const Color(
+                  0xFF10163A,
+                ), // Menyesuaikan tema warna Navy Anda
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                child: Text(
+                  'Saya Mengerti',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -586,48 +644,33 @@ class _MechanicHomePageState extends State<MechanicHomePage> {
     required String label,
   }) {
     final bool active = activeIndex == index;
-
     return GestureDetector(
-    onTap: () {
-        if (index == 0) {
-          return;
-        }
-
+      onTap: () {
+        if (index == 0) return;
         if (index == 1) {
-
           final activeOrder = orders.firstWhere(
-            (o) =>
-                o['status'] == 'on_the_way' ||
-                o['status'] == 'service',
+            (o) => o['status'] == 'on_the_way' || o['status'] == 'service',
             orElse: () => null,
           );
-
           if (activeOrder == null) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Belum ada order aktif'),
-              ),
+              const SnackBar(content: Text('Belum ada order aktif')),
             );
             return;
           }
-
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => MechanicTrackingPage(
-                orderId: activeOrder['id'],
-              ),
+              builder: (_) => MechanicTrackingPage(orderId: activeOrder['id']),
             ),
           );
         }
-
         if (index == 2) {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const MechanicChatListPage()),
+            MaterialPageRoute(builder: (_) => const MechanicMenuChatPage()),
           );
         }
-
         if (index == 3) {
           Navigator.push(
             context,

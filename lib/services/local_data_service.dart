@@ -21,6 +21,7 @@ class LocalDataService {
   }
 
   static Future<void> saveProfile({
+    required String id, // ✅ TAMBAHKAN PARAMETER ID DI SINI
     required String name,
     required String email,
     required String phone,
@@ -28,6 +29,7 @@ class LocalDataService {
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final data = {
+      'id': id, // ✅ SIMPAN ID KE DALAM LOCAL DATA STORAGE
       'name': name,
       'email': email,
       'phone': phone,

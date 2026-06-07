@@ -35,13 +35,14 @@ class _LoginPageState extends State<LoginPage> {
       // Url dasar (baseUrl) dan header Content-Type sudah terbungkus otomatis di dalamnya.
       final loginInput = _emailCtrl.text.trim();
       final isPhoneLogin = _isPhoneInput(loginInput);
-      final payload = isPhoneLogin
-          ? {
-            'email': loginInput,
-            'phone': _normalizePhone(loginInput),
-            'password': _passCtrl.text,
-          }
-          : {'email': loginInput, 'password': _passCtrl.text};
+      final payload =
+          isPhoneLogin
+              ? {
+                'email': loginInput,
+                'phone': _normalizePhone(loginInput),
+                'password': _passCtrl.text,
+              }
+              : {'email': loginInput, 'password': _passCtrl.text};
 
       final response = await ApiService.client.post('/login', data: payload);
 
@@ -58,6 +59,7 @@ class _LoginPageState extends State<LoginPage> {
         final String email = data['user']['email']?.toString() ?? '';
         final String role =
             data['user']['role']?.toString().toLowerCase() ?? 'user';
+        final String StringUserId = data['user']['id']?.toString() ?? '1';
 
         // 3. Simpan data otentikasi dasar ke SharedPreferences
         final prefs = await SharedPreferences.getInstance();
@@ -73,11 +75,13 @@ class _LoginPageState extends State<LoginPage> {
         final savedPhone = existingProfile['phone']?.trim() ?? '';
         final loginPhone = _normalizePhone(_emailCtrl.text);
 
-        final resolvedPhone = apiPhone.isNotEmpty
-            ? apiPhone
-            : (savedPhone.isNotEmpty ? savedPhone : loginPhone);
+        final resolvedPhone =
+            apiPhone.isNotEmpty
+                ? apiPhone
+                : (savedPhone.isNotEmpty ? savedPhone : loginPhone);
 
         await LocalDataService.saveProfile(
+          id: StringUserId,
           name: name,
           email: email,
           phone: resolvedPhone,

@@ -1,6 +1,6 @@
 class AppConstants {
   // Alamat dasar API Laravel Anda yang di-hosting di Render
-  static const String baseUrl = "https://backend-qgis.onrender.com/api";
+  static const String baseUrl = "https://bengkel-tracker.onrender.com/api";
 
   // Kamus Endpoint (Opsional, untuk mempermudah manajemen rute API ke depan)
   static const String login = "/login";

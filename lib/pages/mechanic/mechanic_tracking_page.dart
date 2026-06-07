@@ -1,13 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/api.dart';
+import '../../services/local_data_service.dart';
 
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
-import 'mechanic_chat_page.dart';
 
 import '../../constants/app_colors.dart';
+import '../chat_detail_page.dart'; //
 
 class MechanicTrackingPage extends StatefulWidget {
   final bool hasActiveOrder;
@@ -24,10 +25,7 @@ class MechanicTrackingPage extends StatefulWidget {
 }
 
 class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
-  // Controller untuk menggerakkan peta
   final MapController _mapController = MapController();
-  
-  // Stream untuk memantau pergerakan GPS
   StreamSubscription<Position>? _positionStream;
 
   Map<String, dynamic>? _orderData;
@@ -37,6 +35,7 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
   bool _isLoading = true;
   String _distanceText = 'Menghitung...';
   String _etaText = '...';
+  int _currentUserId = 1; // Menyimpan ID mekanik login aktif
 
   @override
   void initState() {
@@ -46,14 +45,19 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
 
   @override
   void dispose() {
-    // Wajib dimatikan agar GPS tidak terus menyala di background
     _positionStream?.cancel();
     super.dispose();
   }
 
   Future<void> _initializeTracking() async {
     try {
-      // 1. Ambil data order (Posisi Pelanggan) dari API
+      // Load id mekanik login
+      final profile = await LocalDataService.getProfile();
+      if (profile.containsKey('id')) {
+        _currentUserId = int.tryParse(profile['id'].toString()) ?? 1;
+      }
+
+      // Ambil data order (Posisi Pelanggan) dari API
       final response = await ApiService.client.get(
         '/orders/${widget.orderId}/tracking',
       );
@@ -65,7 +69,6 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
         double.parse(data['user_longitude'].toString()),
       );
 
-      // 2. Mulai Lacak GPS Mekanik
       await _startLocationTracking();
     } catch (e) {
       debugPrint('Error loading data: $e');
@@ -79,7 +82,6 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
   }
 
   Future<void> _startLocationTracking() async {
-    // Cek status dan izin GPS
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) return;
 
@@ -91,17 +93,15 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
 
     if (permission == LocationPermission.deniedForever) return;
 
-    // Ambil lokasi awal
     Position initialPosition = await Geolocator.getCurrentPosition(
       desiredAccuracy: LocationAccuracy.high,
     );
     _updateTrackingInfo(initialPosition);
 
-    // Pantau pergerakan (Real-time update)
     _positionStream = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 5, // Update jika bergerak 5 meter
+        distanceFilter: 5,
       ),
     ).listen((Position position) {
       _updateTrackingInfo(position);
@@ -109,26 +109,17 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
   }
 
   void _updateTrackingInfo(Position position) {
-
-    _sendLocationToServer(
-      position.latitude,
-      position.longitude,
-    );
+    _sendLocationToServer(position.latitude, position.longitude);
 
     if (!mounted) return;
 
     setState(() {
       _mechanicPosition = LatLng(position.latitude, position.longitude);
 
-      // Otomatis geser peta mengikuti mekanik
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _mapController.move(
-          _mechanicPosition!,
-          16.0,
-        );
+        _mapController.move(_mechanicPosition!, 16.0);
       });
 
-      // Hitung Jarak
       if (_customerPosition != null) {
         final distanceInMeters = Geolocator.distanceBetween(
           position.latitude,
@@ -137,14 +128,12 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
           _customerPosition!.longitude,
         );
 
-        // Format Jarak
         if (distanceInMeters >= 1000) {
           _distanceText = '${(distanceInMeters / 1000).toStringAsFixed(1)} km';
         } else {
           _distanceText = '${distanceInMeters.round()} m';
         }
 
-        // Estimasi Waktu (Asumsi kecepatan rata-rata 30 km/jam)
         double speedKmh = 30.0;
         double hours = (distanceInMeters / 1000) / speedKmh;
         int minutes = (hours * 60).round();
@@ -158,39 +147,26 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
     });
   }
 
-  Future<void> _sendLocationToServer(
-    double lat,
-    double lng,
-  ) async {
+  Future<void> _sendLocationToServer(double lat, double lng) async {
     try {
-
-      final response = await ApiService.client.patch(
+      await ApiService.client.patch(
         '/mechanics/${_orderData?['mechanic_id']}/location',
-        data: {
-          'lat': lat,
-          'lng': lng,
-        },
+        data: {'lat': lat, 'lng': lng},
       );
-
-      print(response.statusCode);
-      print(response.data);
-
     } catch (e) {
-      print(e);
+      debugPrint('Error upload location: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    if (_orderData == null || _customerPosition == null || _mechanicPosition == null) {
+    if (_orderData == null ||
+        _customerPosition == null ||
+        _mechanicPosition == null) {
       return _buildEmptyTrackingPage(context);
     }
 
@@ -200,23 +176,19 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
         children: [
           Positioned.fill(
             child: FlutterMap(
-              mapController: _mapController, // Tambahkan controller
+              mapController: _mapController,
               options: MapOptions(
-                initialCenter: _mechanicPosition!, // Center ke mekanik
+                initialCenter: _mechanicPosition!,
                 initialZoom: 16,
               ),
               children: [
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 ),
-
                 PolylineLayer(
                   polylines: [
                     Polyline(
-                      points: [
-                        _mechanicPosition!,
-                        _customerPosition!,
-                      ],
+                      points: [_mechanicPosition!, _customerPosition!],
                       strokeWidth: 5,
                       color: Colors.blue,
                     ),
@@ -245,7 +217,9 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
             left: 0,
             right: 0,
             top: 0,
-            child: _buildHeader(context),
+            child: _buildTrackingHeader(
+              context,
+            ), // ✅ PERBAIKAN 1: Mengubah nama panggilan header tumpuk
           ),
           Positioned(
             left: 16,
@@ -285,9 +259,7 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
                       borderRadius: BorderRadius.circular(10),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(10),
-                        onTap: () {
-                          Navigator.pop(context);
-                        },
+                        onTap: () => Navigator.pop(context),
                         child: const Icon(
                           Icons.chevron_left,
                           color: Colors.white,
@@ -358,9 +330,7 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
                         width: double.infinity,
                         height: 46,
                         child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                          },
+                          onPressed: () => Navigator.pop(context),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFFF7043),
                             elevation: 0,
@@ -389,7 +359,8 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  // ✅ PERBAIKAN 2: Dipisahkan namanya agar tidak berbenturan dengan header halaman kosong
+  Widget _buildTrackingHeader(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(12, 42, 12, 30),
@@ -404,9 +375,7 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
               borderRadius: BorderRadius.circular(10),
               child: InkWell(
                 borderRadius: BorderRadius.circular(10),
-                onTap: () {
-                  Navigator.pop(context);
-                },
+                onTap: () => Navigator.pop(context),
                 child: const Icon(
                   Icons.chevron_left,
                   color: Colors.white,
@@ -418,7 +387,7 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
           const Expanded(
             child: Center(
               child: Text(
-                'Tracking',
+                'Tracking Lokasi',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 19,
@@ -497,7 +466,7 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
             children: [
               Expanded(
                 child: Text(
-                  data['user_name'] ?? '',
+                  data['user_name'] ?? 'Pelanggan',
                   style: const TextStyle(
                     color: Color(0xFF374151),
                     fontSize: 12,
@@ -534,10 +503,7 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
     );
   }
 
-  Widget _buildBottomSheet(
-    BuildContext context,
-    Map<String, dynamic> data,
-  ) {
+  Widget _buildBottomSheet(BuildContext context, Map<String, dynamic> data) {
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 26),
       decoration: const BoxDecoration(
@@ -565,7 +531,7 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              'ETA $_etaText • $_distanceText', // Update text menggunakan State
+              'ETA $_etaText • $_distanceText',
               style: const TextStyle(
                 color: Color(0xFF6B7280),
                 fontSize: 12,
@@ -583,21 +549,15 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
                   final response = await ApiService.client.post(
                     '/orders/${widget.orderId}/arrive',
                   );
-
                   if (response.statusCode == 200) {
+                    if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Mekanik tiba di lokasi'),
-                      ),
+                      const SnackBar(content: Text('Mekanik tiba di lokasi')),
                     );
                   }
                 } catch (e) {
-                  debugPrint('ERROR ARRIVE: $e');
-
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Gagal update status: $e'),
-                    ),
+                    SnackBar(content: Text('Gagal update status: $e')),
                   );
                 }
               },
@@ -628,12 +588,10 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
                   final response = await ApiService.client.post(
                     '/orders/${widget.orderId}/complete',
                   );
-
                   if (response.statusCode == 200) {
+                    if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Servis selesai'),
-                      ),
+                      const SnackBar(content: Text('Servis selesai')),
                     );
                   }
                 } catch (e) {
@@ -662,16 +620,36 @@ class _MechanicTrackingPageState extends State<MechanicTrackingPage> {
             width: double.infinity,
             height: 44,
             child: OutlinedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => MechanicChatPage(
-                      customerName: data['user_name'] ?? '',
-                      orderId: widget.orderId.toString(),
-                    ),
-                  ),
-                );
+              onPressed: () async {
+                try {
+                  final response = await ApiService.client.post(
+                    '/chat-rooms',
+                    data: {'order_id': widget.orderId},
+                  );
+                  if (response.statusCode == 200 ||
+                      response.statusCode == 201) {
+                    final int roomChatId = response.data['data']['id'];
+                    if (!context.mounted) return;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (_) => ChatDetailPage(
+                              // ✅ Ganti dari MechanicChatPage ke ChatDetailPage universal
+                              chatRoomId: roomChatId,
+                              currentUserId: _currentUserId,
+                              receiverName:
+                                  data['user_name'] ??
+                                  'Pelanggan', // ✅ Kirim nama pelanggan
+                            ),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  debugPrint(
+                    "Gagal memuat room chat pelanggan dari tracking: $e",
+                  );
+                }
               },
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Color(0xFFD1D5DB)),
