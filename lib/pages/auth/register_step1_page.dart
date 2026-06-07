@@ -74,6 +74,7 @@ class _RegisterStep1PageState extends State<RegisterStep1Page> {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         await LocalDataService.saveProfile(
+          id: response.data['id'].toString(),
           name: nameCtrl.text.trim(),
           email: emailCtrl.text.trim(),
           phone: '+62${phoneCtrl.text.replaceAll(' ', '')}',

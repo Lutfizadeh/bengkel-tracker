@@ -1,59 +1,73 @@
 import 'package:flutter/material.dart';
 
 import '../../constants/app_colors.dart';
-import 'mechanic_chat_page.dart';
+import '../../constants/app_assets.dart';
+import '../../services/api.dart';
 import 'mechanic_tracking_page.dart';
 import 'mechanic_profile_page.dart';
+import '../../services/local_data_service.dart';
+import '../chat_detail_page.dart'; // ✅ Import halaman universal
 
-class MechanicChatListPage extends StatefulWidget {
-  const MechanicChatListPage({super.key});
+class MechanicMenuChatPage extends StatefulWidget {
+  const MechanicMenuChatPage({super.key});
 
   @override
-  State<MechanicChatListPage> createState() => _MechanicChatListPageState();
+  State<MechanicMenuChatPage> createState() => _MechanicMenuChatPageState();
 }
 
-class _MechanicChatListPageState extends State<MechanicChatListPage> {
+class _MechanicMenuChatPageState extends State<MechanicMenuChatPage> {
   int activeIndex = 2;
   String selectedFilter = 'semua';
+  int _currentUserId = 1;
 
-  final List<Map<String, dynamic>> chats = [
-    {
-      'name': 'Ahmad Salim',
-      'subtitle': 'Saya tunggu di depan indomar...',
-      'time': '19:22',
-      'initial': 'AS',
-      'color': Color(0xFFFFB5C1),
-      'unread': 3,
-      'online': true,
-    },
-    {
-      'name': 'Rizal Patung',
-      'subtitle': 'Anda: Oke siap Pak, makasih 🙏\nOrder selesai: Rating 4.5',
-      'time': '16 Apr',
-      'initial': 'RP',
-      'color': Color(0xFFC7D7FF),
-      'unread': 0,
-      'online': false,
-    },
-    {
-      'name': 'Budi Speed',
-      'subtitle': 'Saya: Siap Pak, makasih ya 🙏\nOrder selesai: Rating 5.0',
-      'time': '14 Apr',
-      'initial': 'BS',
-      'color': Color(0xFFB8F5C6),
-      'unread': 0,
-      'online': false,
-    },
-    {
-      'name': 'Bengkel Track Support',
-      'subtitle': 'Penghasilan minggu ini: Rp 875.000\nSistem Otomatis',
-      'time': '10 Apr',
-      'initial': 'BT',
-      'color': Color(0xFF131A3D),
-      'unread': 0,
-      'online': false,
-    },
-  ];
+  List<dynamic> _chatRooms = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _initMechanicChatList();
+  }
+
+  Future<void> _initMechanicChatList() async {
+    await _loadMechanicId();
+    await _fetchChatRooms();
+  }
+
+  Future<void> _loadMechanicId() async {
+    final profile = await LocalDataService.getProfile();
+
+    setState(() {
+      // ✅ Mengambil ID user murni yang dikirim dari AuthController Laravel
+      _currentUserId = int.tryParse(profile['id'].toString()) ?? 1;
+    });
+
+    debugPrint("🔑 MEKANIK LOGIN ACTIVE USER_ID: $_currentUserId");
+  }
+
+  Future<void> _fetchChatRooms() async {
+    try {
+      final response = await ApiService.client.get('/chat-rooms');
+      if (response.statusCode == 200 && response.data != null) {
+        setState(() {
+          _chatRooms = response.data['data'] ?? [];
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      debugPrint("Error fetching mechanic chat rooms: $e");
+    }
+  }
+
+  List<dynamic> get filteredChats {
+    return _chatRooms.where((room) {
+      final customerName =
+          (room['customer_name'] ?? 'Pelanggan').toString().toLowerCase();
+      if (selectedFilter == 'pelanggan') return !customerName.contains('admin');
+      return true;
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,41 +77,58 @@ class _MechanicChatListPageState extends State<MechanicChatListPage> {
         top: false,
         child: Stack(
           children: [
-            Column(
-              children: [
-                _buildHeader(),
-                Expanded(
-                  child: Container(
-                    color: Colors.white,
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-                      child: Column(
-                        children: [
-                          _buildSearchBox(),
-                          const SizedBox(height: 12),
-                          _buildFilterTabs(),
-                          const SizedBox(height: 14),
-                          _buildActiveOrderCard(),
-                          const SizedBox(height: 16),
-                          ...List.generate(chats.length, (index) {
-                            return _buildChatItem(chats[index]);
-                          }),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'Tidak ada pesan lagi',
-                            style: TextStyle(
-                              color: Color(0xFFB5B5B5),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
+            Positioned.fill(
+              child:
+                  _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : RefreshIndicator(
+                        onRefresh: _fetchChatRooms,
+                        child: SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildHeader(),
+                              const SizedBox(height: 10),
+                              _buildSearchBox(),
+                              const SizedBox(height: 12),
+                              _buildFilterTabs(),
+                              const SizedBox(height: 14),
+                              _buildActiveOrderCard(),
+                              const SizedBox(height: 16),
+                              if (filteredChats.isEmpty)
+                                const Padding(
+                                  padding: EdgeInsets.all(24),
+                                  child: Center(
+                                    child: Text(
+                                      'Belum ada percakapan aktif.',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              else
+                                ...filteredChats.map(
+                                  (room) => _buildChatItem(room),
+                                ),
+                              const SizedBox(height: 12),
+                              const Center(
+                                child: Text(
+                                  'Tidak ada pesan lagi',
+                                  style: TextStyle(
+                                    color: Color(0xFFB5B5B5),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
-                ),
-              ],
             ),
             Positioned(
               left: 0,
@@ -119,17 +150,14 @@ class _MechanicChatListPageState extends State<MechanicChatListPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(text: 'pesa', style: TextStyle(color: Colors.white)),
-                TextSpan(text: 'n', style: TextStyle(color: Colors.white)),
-              ],
-            ),
+          const Text(
+            'Pesan',
             style: TextStyle(
               fontSize: 22,
+              color: Colors.white,
               fontWeight: FontWeight.w900,
               letterSpacing: .2,
+              fontFamily: 'Syne',
             ),
           ),
           const SizedBox(height: 8),
@@ -201,23 +229,14 @@ class _MechanicChatListPageState extends State<MechanicChatListPage> {
         _filterChip('Semua', 'semua'),
         const SizedBox(width: 8),
         _filterChip('Pelanggan', 'pelanggan'),
-        const SizedBox(width: 8),
-        _filterChip('Admin', 'admin'),
-        const SizedBox(width: 8),
-        _filterChip('CS Support', 'support'),
       ],
     );
   }
 
   Widget _filterChip(String title, String value) {
     final bool active = selectedFilter == value;
-
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          selectedFilter = value;
-        });
-      },
+      onTap: () => setState(() => selectedFilter = value),
       child: Container(
         height: 31,
         padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -243,6 +262,10 @@ class _MechanicChatListPageState extends State<MechanicChatListPage> {
   }
 
   Widget _buildActiveOrderCard() {
+    if (_chatRooms.isEmpty) return const SizedBox.shrink();
+    final activeChat = _chatRooms.first;
+    final String customerName = activeChat['customer_name'] ?? 'Pelanggan';
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
@@ -259,11 +282,11 @@ class _MechanicChatListPageState extends State<MechanicChatListPage> {
             size: 20,
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Order Aktif Sekarang',
                   style: TextStyle(
                     color: Color(0xFFFF7043),
@@ -271,10 +294,10 @@ class _MechanicChatListPageState extends State<MechanicChatListPage> {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
-                  'Ahmad Salim · Mogok / Mesin · OTW',
-                  style: TextStyle(
+                  '${activeChat['customer_name'] ?? 'Pelanggan'} · Kode Order: ${activeChat['order_code'] ?? '-'}',
+                  style: const TextStyle(
                     color: Color(0xFFFF7043),
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
@@ -291,9 +314,12 @@ class _MechanicChatListPageState extends State<MechanicChatListPage> {
                   context,
                   MaterialPageRoute(
                     builder:
-                        (_) => const MechanicChatPage(
-                          customerName: 'Ahmad Salim',
-                          orderId: '#ORD-20240521-001',
+                        (_) => ChatDetailPage(
+                          // ✅ PERBAIKAN: Ubah ke ChatDetailPage universal
+                          chatRoomId:
+                              int.tryParse(activeChat['id'].toString()) ?? 1,
+                          currentUserId: _currentUserId,
+                          receiverName: customerName,
                         ),
                   ),
                 );
@@ -320,16 +346,29 @@ class _MechanicChatListPageState extends State<MechanicChatListPage> {
     );
   }
 
-  Widget _buildChatItem(Map<String, dynamic> chat) {
+  Widget _buildChatItem(Map<String, dynamic> room) {
+    // ✅ Parameter 'room' sudah dikirim langsung ke fungsi ini, tidak perlu _chatRooms[index] lagi
+    final String customerName = room['customer_name'] ?? 'Pelanggan';
+    final String orderCode = room['order_code'] ?? '-';
+    final int orderId =
+        room['order_id'] ?? room['id'] ?? 0; // Mengambil ID order dinamis
+
+    final String initial =
+        customerName
+            .substring(0, customerName.length >= 2 ? 2 : 1)
+            .toUpperCase();
+
     return InkWell(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
             builder:
-                (_) => MechanicChatPage(
-                  customerName: chat['name'],
-                  orderId: '#ORD-20240521-001',
+                (_) => ChatDetailPage(
+                  chatRoomId: room['id'],
+                  currentUserId:
+                      _currentUserId, // ✅ Sisi mekanik akan mengirim ID Mekaniknya (misal: ID 2 atau 3)
+                  receiverName: room['customer_name'] ?? 'Pelanggan',
                 ),
           ),
         );
@@ -340,38 +379,17 @@ class _MechanicChatListPageState extends State<MechanicChatListPage> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Stack(
-              children: [
-                CircleAvatar(
-                  radius: 23,
-                  backgroundColor: chat['color'],
-                  child: Text(
-                    chat['initial'],
-                    style: TextStyle(
-                      color:
-                          chat['initial'] == 'BT'
-                              ? Colors.white
-                              : const Color(0xFF2563EB),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+            CircleAvatar(
+              radius: 23,
+              backgroundColor: AppColors.paleOrange,
+              child: Text(
+                initial,
+                style: const TextStyle(
+                  color: AppColors.orange,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
                 ),
-                if (chat['online'])
-                  Positioned(
-                    right: 1,
-                    bottom: 1,
-                    child: Container(
-                      width: 11,
-                      height: 11,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF22C55E),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                    ),
-                  ),
-              ],
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -389,8 +407,9 @@ class _MechanicChatListPageState extends State<MechanicChatListPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // ✅ MENAMPILKAN ID ORDER DI SAMPING NAMA CUSTOMER
                             Text(
-                              chat['name'],
+                              "$customerName (Order ID: #$orderId)",
                               style: const TextStyle(
                                 color: Color(0xFF111827),
                                 fontSize: 14,
@@ -399,7 +418,8 @@ class _MechanicChatListPageState extends State<MechanicChatListPage> {
                             ),
                             const SizedBox(height: 3),
                             Text(
-                              chat['subtitle'],
+                              room['last_message'] ??
+                                  'Ketuk untuk melihat pesan',
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
@@ -417,36 +437,13 @@ class _MechanicChatListPageState extends State<MechanicChatListPage> {
                     Column(
                       children: [
                         Text(
-                          chat['time'],
-                          style: TextStyle(
-                            color:
-                                chat['unread'] > 0
-                                    ? const Color(0xFFFF7043)
-                                    : const Color(0xFF9CA3AF),
+                          room['updated_at_formatted'] ?? '',
+                          style: const TextStyle(
+                            color: Color(0xFF9CA3AF),
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        if (chat['unread'] > 0)
-                          Container(
-                            width: 18,
-                            height: 18,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFFF7043),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Center(
-                              child: Text(
-                                '${chat['unread']}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ),
-                          ),
                       ],
                     ),
                   ],
@@ -505,17 +502,10 @@ class _MechanicChatListPageState extends State<MechanicChatListPage> {
     required String label,
   }) {
     final bool active = activeIndex == index;
-
     return GestureDetector(
-    onTap: () {
-        if (index == 2) {
-          return;
-        }
-
-        if (index == 0) {
-          Navigator.pop(context);
-        }
-
+      onTap: () {
+        if (index == 2) return;
+        if (index == 0) Navigator.pop(context);
         if (index == 1) {
           Navigator.pushReplacement(
             context,
@@ -524,7 +514,6 @@ class _MechanicChatListPageState extends State<MechanicChatListPage> {
             ),
           );
         }
-
         if (index == 3) {
           Navigator.pushReplacement(
             context,

@@ -3,10 +3,12 @@ import 'package:flutter/services.dart';
 
 import '../constants/app_colors.dart';
 import '../models/workshop.dart';
+import '../services/api.dart';
+import '../services/local_data_service.dart';
 import 'chat_detail_page.dart';
 import 'service_page.dart';
 
-class WorkshopDetailPage extends StatelessWidget {
+class WorkshopDetailPage extends StatefulWidget {
   const WorkshopDetailPage({
     super.key,
     required this.asset,
@@ -16,37 +18,90 @@ class WorkshopDetailPage extends StatelessWidget {
   final String asset;
   final Workshop workshop;
 
+  @override
+  State<WorkshopDetailPage> createState() => _WorkshopDetailPageState();
+}
+
+class _WorkshopDetailPageState extends State<WorkshopDetailPage> {
+  bool _isNavigatingToChat = false;
+
   String _formatDistance(dynamic distance) {
     final text = distance.toString();
-
     if (text.toLowerCase().contains('km')) {
       return text;
     }
-
     return '$text km';
   }
 
   void _shareWorkshop(BuildContext context) {
     final text = '''
-${workshop.title}
+${widget.workshop.title}
 
 Alamat:
-${workshop.address}
+${widget.workshop.address}
 
-Rating: ${workshop.rating}
-Jarak: ${_formatDistance(workshop.distance)}
+Rating: ${widget.workshop.rating}
+Jarak: ${_formatDistance(widget.workshop.distance)}
 
 Cek bengkel ini di aplikasi BengkelTrack.
 ''';
 
     Clipboard.setData(ClipboardData(text: text));
-
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Info bengkel berhasil disalin.'),
         duration: Duration(seconds: 2),
       ),
     );
+  }
+
+  // ✅ PERBAIKAN: Menambahkan argumen receiverName dinamis dari judul Bengkel/Workshop
+  Future<void> _handleChatNavigation(BuildContext context) async {
+    if (_isNavigatingToChat) return;
+
+    setState(() => _isNavigatingToChat = true);
+
+    try {
+      final profile = await LocalDataService.getProfile();
+      final int currentUserId = int.tryParse(profile['id'].toString()) ?? 1;
+
+      final response = await ApiService.client.post(
+        '/chat-rooms',
+        data: {'workshop_id': widget.workshop.id, 'order_id': 1},
+      );
+
+      if ((response.statusCode == 200 || response.statusCode == 201) &&
+          response.data != null) {
+        final int chatRoomId = response.data['data']['id'];
+
+        if (!mounted) return;
+
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder:
+                (_) => ChatDetailPage(
+                  chatRoomId: chatRoomId,
+                  currentUserId: currentUserId,
+                  receiverName:
+                      widget
+                          .workshop
+                          .title, // ✅ Mengisi parameter nama bengkel dinamis
+                ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("Gagal memproses pembuatan chat room bengkel: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Gagal membuka percakapan dengan bengkel.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isNavigatingToChat = false);
+    }
   }
 
   @override
@@ -101,14 +156,12 @@ Cek bengkel ini di aplikasi BengkelTrack.
                                     child: SizedBox(
                                       height: 48,
                                       child: OutlinedButton(
-                                        onPressed: () {
-                                          Navigator.of(context).push(
-                                            MaterialPageRoute(
-                                              builder:
-                                                  (_) => const ChatDetailPage(),
-                                            ),
-                                          );
-                                        },
+                                        onPressed:
+                                            _isNavigatingToChat
+                                                ? null
+                                                : () => _handleChatNavigation(
+                                                  context,
+                                                ),
                                         style: OutlinedButton.styleFrom(
                                           side: const BorderSide(
                                             color: AppColors.orange,
@@ -120,14 +173,25 @@ Cek bengkel ini di aplikasi BengkelTrack.
                                           ),
                                           backgroundColor: AppColors.white,
                                         ),
-                                        child: const Text(
-                                          'Chat',
-                                          style: TextStyle(
-                                            color: AppColors.orange,
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
+                                        child:
+                                            _isNavigatingToChat
+                                                ? const SizedBox(
+                                                  width: 18,
+                                                  height: 18,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                        color: AppColors.orange,
+                                                      ),
+                                                )
+                                                : const Text(
+                                                  'Chat',
+                                                  style: TextStyle(
+                                                    color: AppColors.orange,
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
                                       ),
                                     ),
                                   ),
@@ -185,16 +249,14 @@ Cek bengkel ini di aplikasi BengkelTrack.
     final now = TimeOfDay.now();
     final bool isOpenNow = now.hour >= 6 && now.hour < 21;
     final String statusText = isOpenNow ? 'Buka' : 'Tutup';
-    final Color statusColor =
-        isOpenNow ? AppColors.brightGreen : AppColors.red;
+    final Color statusColor = isOpenNow ? AppColors.brightGreen : AppColors.red;
     const String timeText = '06:00 - 21:00';
 
     return Container(
-      // ✅ PERBAIKAN: Hapus height: 170 yang fixed, biarkan menyesuaikan konten
       width: double.infinity,
       color: AppColors.navy,
       child: Column(
-        mainAxisSize: MainAxisSize.min, // ✅ PERBAIKAN: Tidak paksa stretch
+        mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 18, 0),
@@ -248,12 +310,7 @@ Cek bengkel ini di aplikasi BengkelTrack.
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(
-              18,
-              10,
-              18,
-              10,
-            ), // ✅ PERBAIKAN: Tambah bottom padding 10
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -266,7 +323,7 @@ Cek bengkel ini di aplikasi BengkelTrack.
                   ),
                   child: Center(
                     child:
-                        asset.isEmpty
+                        widget.asset.isEmpty
                             ? const Icon(
                               Icons.store,
                               color: AppColors.white,
@@ -275,7 +332,7 @@ Cek bengkel ini di aplikasi BengkelTrack.
                             : ClipRRect(
                               borderRadius: BorderRadius.circular(6),
                               child: Image.asset(
-                                asset,
+                                widget.asset,
                                 width: 40,
                                 height: 40,
                                 fit: BoxFit.cover,
@@ -289,7 +346,7 @@ Cek bengkel ini di aplikasi BengkelTrack.
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        workshop.title,
+                        widget.workshop.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -301,7 +358,7 @@ Cek bengkel ini di aplikasi BengkelTrack.
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        workshop.address,
+                        widget.workshop.address,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -351,20 +408,22 @@ Cek bengkel ini di aplikasi BengkelTrack.
               ],
             ),
           ),
-          // ✅ PERBAIKAN: Hapus Spacer(), ganti langsung ke stats bar
           Container(
             height: 41,
             color: AppColors.white15,
             child: Row(
               children: [
                 _StatItem(
-                  value: _formatDistance(workshop.distance),
+                  value: _formatDistance(widget.workshop.distance),
                   label: 'Jarak',
                 ),
                 const _HeaderDivider(),
                 const _StatItem(value: '128', label: 'Review'),
                 const _HeaderDivider(),
-                _StatItem(value: workshop.rating.toString(), label: 'Rating'),
+                _StatItem(
+                  value: widget.workshop.rating.toString(),
+                  label: 'Rating',
+                ),
                 const _HeaderDivider(),
                 const _StatItem(value: '5+', label: 'Mekanik'),
               ],
@@ -377,7 +436,6 @@ Cek bengkel ini di aplikasi BengkelTrack.
 
   Widget _buildAvailableServices() {
     final services = ['Motor', 'Mobil', 'Ganti Oli', 'Ban Bocor', 'Lainnya'];
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 18),
       child: Column(
@@ -398,7 +456,6 @@ Cek bengkel ini di aplikasi BengkelTrack.
             children:
                 services.map((item) {
                   final active = item == 'Motor' || item == 'Mobil';
-
                   return Container(
                     height: 22,
                     padding: const EdgeInsets.symmetric(horizontal: 11),
@@ -518,46 +575,37 @@ Cek bengkel ini di aplikasi BengkelTrack.
 
 class _StatItem extends StatelessWidget {
   const _StatItem({required this.value, required this.label});
-
-  final String value;
-  final String label;
-
+  final String value, label;
   @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              value,
-              maxLines: 1,
-              style: const TextStyle(
-                color: AppColors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-              ),
+  Widget build(BuildContext context) => Expanded(
+    child: FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              color: AppColors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
             ),
-            Text(
-              label,
-              maxLines: 1,
-              style: const TextStyle(color: AppColors.gray, fontSize: 9),
-            ),
-          ],
-        ),
+          ),
+          Text(
+            label,
+            style: const TextStyle(color: AppColors.gray, fontSize: 9),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _HeaderDivider extends StatelessWidget {
   const _HeaderDivider();
-
   @override
-  Widget build(BuildContext context) {
-    return Container(width: 1, height: 22, color: AppColors.white15);
-  }
+  Widget build(BuildContext context) =>
+      Container(width: 1, height: 22, color: AppColors.white15);
 }
 
 class _OperationalRow extends StatelessWidget {
@@ -566,27 +614,22 @@ class _OperationalRow extends StatelessWidget {
     required this.time,
     this.closed = false,
   });
-
-  final String day;
-  final String time;
+  final String day, time;
   final bool closed;
-
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(day, style: const TextStyle(color: AppColors.gray, fontSize: 11)),
-        const Spacer(),
-        Text(
-          time,
-          style: TextStyle(
-            color: closed ? Colors.red : AppColors.textDark,
-            fontSize: 11,
-          ),
+  Widget build(BuildContext context) => Row(
+    children: [
+      Text(day, style: const TextStyle(color: AppColors.gray, fontSize: 11)),
+      const Spacer(),
+      Text(
+        time,
+        style: TextStyle(
+          color: closed ? Colors.red : AppColors.textDark,
+          fontSize: 11,
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
 }
 
 class _ReviewCard extends StatelessWidget {
@@ -598,101 +641,90 @@ class _ReviewCard extends StatelessWidget {
     required this.message,
     required this.color,
   });
-
-  final String initial;
-  final String name;
-  final String rating;
-  final String time;
-  final String message;
+  final String initial, name, rating, time, message;
   final Color color;
-
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 64),
-      padding: const EdgeInsets.fromLTRB(9, 8, 9, 8),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        border: Border.all(color: AppColors.warmBorder),
-        borderRadius: BorderRadius.circular(9),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 13,
-            backgroundColor: color,
-            child: Text(
-              initial,
-              style: const TextStyle(
-                color: AppColors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
+  Widget build(BuildContext context) => Container(
+    constraints: const BoxConstraints(minHeight: 64),
+    padding: const EdgeInsets.fromLTRB(9, 8, 9, 8),
+    decoration: BoxDecoration(
+      color: AppColors.white,
+      border: Border.all(color: AppColors.warmBorder),
+      borderRadius: BorderRadius.circular(9),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CircleAvatar(
+          radius: 13,
+          backgroundColor: color,
+          child: Text(
+            initial,
+            style: const TextStyle(
+              color: AppColors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textDark,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      time,
+        ),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: AppColors.gray,
-                        fontSize: 8.5,
+                        color: AppColors.textDark,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 1),
-                Row(
-                  children: [
-                    const Text(
-                      '★ ★ ★ ★ ★',
-                      style: TextStyle(color: AppColors.orange, fontSize: 8),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      rating,
-                      style: const TextStyle(
-                        color: AppColors.gray,
-                        fontSize: 9,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  message,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.gray,
-                    fontSize: 10.5,
-                    height: 1.25,
                   ),
+                  const SizedBox(width: 8),
+                  Text(
+                    time,
+                    style: const TextStyle(
+                      color: AppColors.gray,
+                      fontSize: 8.5,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 1),
+              Row(
+                children: [
+                  const Text(
+                    '★ ★ ★ ★ ★',
+                    style: TextStyle(color: AppColors.orange, fontSize: 8),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    rating,
+                    style: const TextStyle(color: AppColors.gray, fontSize: 9),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                message,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.gray,
+                  fontSize: 10.5,
+                  height: 1.25,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
 }

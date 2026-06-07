@@ -19,6 +19,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   String _photoPath = '';
+  String _userId = '1'; // ✅ Tambahkan variabel untuk menampung ID user aktif
 
   @override
   void initState() {
@@ -28,10 +29,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   Future<void> _loadProfile() async {
     final profile = await LocalDataService.getProfile();
+    _userId =
+        profile['id'] ?? '1'; // ✅ Ambil ID asli dari SharedPreferences lokal
     _nameController.text = profile['name'] ?? 'Pengguna';
     _emailController.text = profile['email'] ?? 'pengguna@gmail.com';
 
-    // Perbaikan: Pastikan jika null atau kosong, isi dengan string kosong agar user bisa mengetik baru
     final rawPhone = profile['phone'] ?? '';
     _phoneController.text = rawPhone.isNotEmpty ? _cleanPhone(rawPhone) : '';
 
@@ -62,7 +64,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // ✅ PERBAIKAN 1: Oper parameter 'id' yang required ke LocalDataService
     await LocalDataService.saveProfile(
+      id: _userId,
       name: _nameController.text.trim(),
       email: _emailController.text.trim(),
       phone: '+62 ${_phoneController.text.trim()}',
@@ -98,7 +103,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(color: AppColors.warmBorder),
-                    boxShadow: appShadow,
+                    // ✅ PERBAIKAN 2: Ganti 'appShadow' kustom dengan BoxShadow bawaan yang aman
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: Form(
                     key: _formKey,
